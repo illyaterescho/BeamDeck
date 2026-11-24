@@ -23,6 +23,13 @@ class AgentService : Service() {
     internal lateinit var geometryController: GeometryController
         private set
     private lateinit var projector: SystemProjectorController
+    internal lateinit var shell: ShellBridge
+        private set
+    internal lateinit var router: CommandRouter
+        private set
+    internal var ble: BleLink? = null
+        private set
+    private var ticks = 0
     private val main = Handler(Looper.getMainLooper())
     private val networkCheck = Runnable { monitorNetwork() }
     private val sleepCheck = Runnable { expireSleep() }
@@ -47,6 +54,11 @@ class AgentService : Service() {
         geometryController = GeometryController(this)
         projector = SystemProjectorController(this)
         controls = ProjectorControls(this)
+        shell = ShellBridge(this)
+        router = CommandRouter(controls, projector, geometryController, InputEngine(this, shell)) {
+            JSONObject().put("ble", ble?.state ?: "off").put("bleClients", ble?.connected ?: 0)
+                .put("lan", listeningOn?.url ?: JSONObject.NULL)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -71,6 +83,8 @@ class AgentService : Service() {
         lastProblem = null
         sessions.rotate()
         current = this
+        ble = BleLink(this, sessions) { router }.also { it.start() }
+        shell.probe()
         monitorNetwork()
         return START_NOT_STICKY
     }
@@ -93,6 +107,8 @@ class AgentService : Service() {
     private fun monitorNetwork() {
         val lan = runCatching { Lan.find(this) }.getOrNull()
         if (lan != desiredLan) switchNetwork(lan)
+        // Re-check loopback adb every ~10 s until the user has accepted the RSA prompt.
+        if (++ticks % 5 == 0 && shell.state != ShellBridge.State.Ready) shell.probe()
         main.postDelayed(networkCheck, 2_000)
     }
 
@@ -106,7 +122,7 @@ class AgentService : Service() {
             runCatching { server?.stop() }
             server = null
             val ready = lan != null && runCatching {
-                val candidate = LocalServer(lan, assets, sessions, controls, geometryController, projector)
+                val candidate = LocalServer(lan, assets, sessions, controls, geometryController, projector, router, shell)
                 try {
                     candidate.start()
                     server = candidate
@@ -166,6 +182,9 @@ class AgentService : Service() {
             main.removeCallbacksAndMessages(null)
             scheduleSleep(0)
             switchNetwork(null)
+            ble?.stop()
+            ble = null
+            shell.close()
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()

@@ -1,25 +1,17 @@
 <resources>
     <string name="app_name">BeamDeck Agent</string>
-    <string name="leave_with_home">Після підключення натисніть Home, щоб перейти в іншу програму. Сервер продовжить працювати у фоні.</string>
     <string name="open_grid">Тестова сітка на проєкторі</string>
     <string name="open_player">Відкрити плеєр BeamDeck</string>
-    <string name="accessibility_settings">Спеціальні можливості</string>
-    <string name="agent_app_info">Інформація про BeamDeck</string>
-    <string name="navigation_connected">Навігація: служба підключена</string>
-    <string name="navigation_waiting">Навігація: увімкнено в Android, очікуємо підключення служби</string>
-    <string name="navigation_disabled">Навігація: вимкнено в Android</string>
-    <string name="start_server">Увімкнути сервер</string>
-    <string name="stop_server">Вимкнути сервер</string>
     <string name="accessibility_name">BeamDeck · Навігація</string>
     <string name="keyboard_name">Клавіатура BeamDeck</string>
     <string name="media_access_name">BeamDeck · Медіа</string>
-    <string name="accessibility_description">Дає парному пульту доступ до дій «Назад», «Додому», стрілок і OK та запуску програм із фону. BeamDeck не читає вміст екрана.</string>
+    <string name="accessibility_description">Дає парному пульту стрілки, OK, «Назад», «Додому», курсор і запуск програм. Щоб переміщувати фокус на Android до 13, служба бачить розташування кнопок на екрані. Текст і вміст нікуди не передаються й не зберігаються. Під час навчання кнопок служба один раз зчитує код натиснутої клавіші фізичного пульта.</string>
     <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#D1B4FF</item>
-        <item name="android:windowBackground">#100E17</item>
-        <item name="android:statusBarColor">#100E17</item>
-        <item name="android:navigationBarColor">#100E17</item>
+        <item name="android:colorAccent">#0A84FF</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

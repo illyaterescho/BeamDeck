@@ -21,7 +21,7 @@ export type CinemaSettings = {
 }
 export type PlayerStatus = { ready: boolean; effects: boolean; audio: boolean; fps: number; reduced: boolean; compression?: boolean; sceneBrightness?: number | null }
 export type ProjectorStatus = {
-  focus: 'unsupported' | 'lumina'; navigation?: 'lumina'; keystone: 'player_only'; hardwareAutoKeystone: 'unsupported'
+  focus: 'unsupported'; keystone: 'player_only'; hardwareAutoKeystone: 'unsupported'
   vendorLauncher: string | null
   canOpen: boolean; keyboard: 'ready' | 'keyboard_required' | 'field_required' | 'protected_field'
   display: 'closed' | 'grid' | 'player'; playing: boolean

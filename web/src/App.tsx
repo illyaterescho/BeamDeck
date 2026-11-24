@@ -243,7 +243,7 @@ function RemoteControl({ status, disabled, run, blocked, onKeyboard, sendSliderV
   }
 
   return <section className="remote-shell glass" aria-label="Кнопки пульта">
-    <div className="pad-header"><span><span className="mini-lens" />{status.projector?.navigation === 'lumina' ? 'Lumina Go' : 'Навігація'}</span>
+    <div className="pad-header"><span><span className="mini-lens" />Навігація</span>
       <div className="remote-modes"><button className="mode-toggle" title={touch ? 'Перейти до стрілок' : 'Перейти до сенсорної панелі'}
         aria-label="Сенсорна панель" aria-pressed={touch && touchEnabled} disabled={!touchEnabled}
         onClick={() => setTouch(value => !value)}><MousePointer2 size={15} /><span>{touch && touchEnabled ? 'Дотик' : 'Стрілки'}</span></button>
@@ -415,8 +415,8 @@ export function App() {
       if (haptics && typeof navigator.vibrate === 'function') navigator.vibrate(12)
       const result = await agent.act(action)
       if (result.volume) reportVolume(result.volume)
-      else if (result.code !== 'lumina_submitted') await refresh.current()
-      if (result.outcome === 'submitted' && action.type !== 'input' && result.code !== 'lumina_submitted') {
+      else if (result.code !== 'key_submitted') await refresh.current()
+      if (result.outcome === 'submitted' && action.type !== 'input' && result.code !== 'key_submitted') {
         const text = action.type === 'scene' ? 'Гучність встановлено. Запит на запуск надіслано Android.' :
           (action.type === 'launch' || action.type === 'open') ? 'Запит на відкриття надіслано Android.' : 'Команду передано плеєру.'
         setFeedback({ text, error: false })

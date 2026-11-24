@@ -217,14 +217,14 @@ export function GeometryStudio({ status, demo, connected, busy, run }: {
         </section>
         <section className="studio-section">
           <h2>Фокус об’єктива</h2>
-          {status.projector?.focus === 'lumina' ? <div className="tools">
+          {(status.capabilities.focusUp?.available || status.capabilities.focusDown?.available) ? <div className="tools">
           <button className="studio-icon" aria-label="Фокус мінус" disabled={!connected || busy || !status.capabilities.focusDown?.available}
             onClick={() => void run({ type: 'command', command: 'focusDown' })}><Minus size={19} /></button>
           <button className="studio-icon" aria-label="Фокус плюс" disabled={!connected || busy || !status.capabilities.focusUp?.available}
             onClick={() => void run({ type: 'command', command: 'focusUp' })}><Plus size={19} /></button>
           <button className="secondary" disabled={!connected || busy || !status.capabilities.autoFocus?.available}
             onClick={() => void run({ type: 'command', command: 'autoFocus' })}>Автофокус</button>
-        </div> : <p className="hint">Команди мотора залежать від API виробника. Відкрийте штатні налаштування й скористайтеся стрілками пульта.</p>}
+        </div> : <p className="hint">Навчіть кнопки фокуса в програмі BeamDeck для iPhone (Проєктор → Кнопки пульта) і ввімкніть налагодження по мережі на проєкторі.</p>}
           <button className="secondary" disabled={!canOpen} onClick={() => open('settings')}><Crosshair size={17} /> Налаштування проєктора</button>
           <button className="text-button" onClick={() => setTab('wall')}>Перевірити різкість за фото</button>
         </section>

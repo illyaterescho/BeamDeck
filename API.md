@@ -81,8 +81,15 @@ WebSocket приймає лише текстові повідомлення до
 HTTP JSON обмежено 8192 байтами. Введення в поле обмежено 1500 символами й 4096 байтами UTF-8. `input_submitted` означає, що InputConnection прийняв запит. `keyboard_required`, `field_required` і `protected_field` пояснюють недоступність введення. `invalid_geometry` та `invalid_url` означають некоректні дані. `editor_busy` означає, що інший клієнт редагує геометрію. `video_required` означає, що у власному плеєрі ще немає відкритого відео.
 
 
-## Розширення 0.2.2
+## Розширення 0.3
 
-`GET /status` і `GET /capabilities` включають можливості сумісного штатного приймача проєктора. `status.projector.navigation` і `status.projector.focus` можуть мати значення `lumina`. `POST /command` підтримує `focusUp`, `focusDown` і `autoFocus` лише за наявності відповідних штатних команд. Навігація та відносні команди гучності використовують штатний приймач, якщо він їх підтримує. `lumina_submitted` означає підтвердження приймачем, `lumina_unavailable` означає збій зв’язку з приймачем. BeamDeck виконує фіксований перелік команд.
+Вигаданий приймач Lumina на `:8899` прибрано. Команди виконує сам приймач BeamDeck через loopback ADB або службу спеціальних можливостей.
 
-`POST /volume` повертає поле `volume` з фактичним рівнем Android і запитує показ системної панелі. Відповідь команд гучності також містить підтверджений стан, коли Agent може прочитати його з Android.
+| Метод і шлях від `/api/v1` | Тіло або результат |
+| --- | --- |
+| `POST /rpc` | `{"op":"key","key":"menu"}` та інші `op` з [PROTOCOL.md](PROTOCOL.md), крім `pair` і `auth`. |
+| `GET /screen.jpg` | JPEG екрана проєктора шириною до 960 px. Потрібен ADB. |
+
+`POST /command` тепер приймає також `menu`, `settings`, `recents`, `power`, `standby`, `wakeup`, `input`, `keystone`, `custom1`, `custom2`. Фокус і трапеція працюють після навчання кнопок.
+`status.receiver` містить `ble`, `bleClients`, `lan`, `adb` (`ready`, `authorizing` або `off`), `accessibility` і `foreground`. `status.learning` показує поточне навчання кнопки.
+Нові коди: `adb_required`, `adb_authorizing`, `adb_lost`, `adb_timeout`, `learn_required`, `no_focus`. `key_submitted` означає, що Android прийняв натискання через ADB.

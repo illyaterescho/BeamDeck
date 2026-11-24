@@ -3,16 +3,16 @@ package ua.beamdeck.agent
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.StateListDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -21,7 +21,6 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
-import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -30,190 +29,279 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import java.lang.ref.WeakReference
 
+/** Receiver home screen on the projector, laid out like a tvOS settings pane. */
 class MainActivity : Activity() {
     private val main = Handler(Looper.getMainLooper())
-    private val refresh = Runnable { renderStatus(); queueRefresh() }
-    private val lilac = Color.rgb(209, 180, 255)
-    private val muted = Color.rgb(194, 184, 209)
-    private lateinit var serverButton: Button
-    private lateinit var pinButton: Button
-    private lateinit var revokeButton: Button
-    private lateinit var networkText: TextView
-    private lateinit var statusText: TextView
-    private lateinit var navigationText: TextView
+    private val refresh = object : Runnable {
+        override fun run() { render(); main.postDelayed(this, 1000) }
+    }
     private lateinit var pinText: TextView
+    private lateinit var pinHint: TextView
+    private lateinit var linkText: TextView
     private lateinit var qr: ImageView
+    private lateinit var serverRow: Row
+    private val status = LinkedHashMap<String, Row>()
     private var qrUrl: String? = null
+
+    private class Row(val view: LinearLayout, val title: TextView, val detail: TextView, val dot: View)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val root = column(10).apply { setPadding(dp(27), dp(20), dp(27), dp(24)) }
-        root.addView(text("BeamDeck Agent", 30, Color.WHITE, bold = true))
-        root.addView(text("${Build.MANUFACTURER} ${Build.MODEL}  ·  Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})", 14))
-
+        window.decorView.setBackgroundColor(BACKGROUND)
         val wide = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val body = column(0).apply { orientation = if (wide) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL }
-        val connection = column(7).apply {
-            background = panel(Color.rgb(33, 28, 48), 18)
-            setPadding(dp(16), dp(12), dp(16), dp(14))
+        val root = LinearLayout(this).apply {
+            orientation = if (wide) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+            setPadding(dp(48), dp(36), dp(48), dp(36))
         }
-        statusText = text("", 16, lilac, bold = true)
-        networkText = text("", 15)
-        pinText = text("", 24, Color.WHITE, bold = true).apply { typeface = Typeface.MONOSPACE }
+
+        val left = column()
+        left.addView(text("BeamDeck", 34, LABEL, Typeface.BOLD))
+        left.addView(text("${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}", 15, SECONDARY), gap(4))
+        val card = column().apply {
+            background = rounded(GROUPED, 22)
+            setPadding(dp(24), dp(20), dp(24), dp(22))
+        }
+        card.addView(text("Код підключення", 13, SECONDARY, Typeface.BOLD))
+        pinText = text("— — —", 54, LABEL, Typeface.BOLD).apply {
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            letterSpacing = 0.12f
+        }
+        card.addView(pinText, gap(2))
+        pinHint = text("", 14, SECONDARY)
+        card.addView(pinHint)
         qr = ImageView(this).apply {
-            contentDescription = "QR-код адреси вебпульта"
-            visibility = View.GONE
+            contentDescription = "QR-код вебпульта"
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setBackgroundColor(Color.WHITE)
+            background = rounded(Color.WHITE, 14)
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            visibility = View.GONE
         }
-        navigationText = text("", 14, lilac, bold = true)
-        connection.addView(statusText)
-        connection.addView(navigationText)
-        connection.addView(networkText)
-        connection.addView(pinText)
-        val qrSize = if (wide) 116 else 164
-        connection.addView(qr, LinearLayout.LayoutParams(dp(qrSize), dp(qrSize)).apply { topMargin = dp(4) })
-        connection.addView(text(getString(R.string.leave_with_home), 13))
-        val controls = column(6)
-        serverButton = button("Увімкнути сервер") { toggleServer() }
-        pinButton = button("Новий PIN") {
-            AgentService.current?.sessions?.rotate()
-            renderStatus()
+        card.addView(qr, LinearLayout.LayoutParams(dp(148), dp(148)).apply { topMargin = dp(18) })
+        linkText = text("", 15, SECONDARY)
+        card.addView(linkText, gap(10))
+        left.addView(card, gap(22))
+        left.addView(text("iPhone: відкрийте BeamDeck і виберіть цей проєктор. Браузер: відскануйте QR-код.", 14, SECONDARY), gap(14))
+
+        val right = column()
+        right.addView(header("Стан"))
+        val stateGroup = group()
+        for ((key, title) in listOf(
+            "ble" to "Bluetooth", "lan" to "Wi-Fi", "adb" to "Системні кнопки (ADB)",
+            "nav" to "Навігація", "keyboard" to "Клавіатура", "media" to "Медіа",
+        )) status[key] = row(stateGroup, title, true) { open(key) }
+        right.addView(stateGroup)
+        right.addView(header("Дії"), gap(22))
+        val actions = group()
+        serverRow = row(actions, "Вимкнути приймач", false) { toggleServer() }
+        row(actions, "Новий код", false) { AgentService.current?.sessions?.rotate(); render() }
+        row(actions, "Завершити всі сеанси", false) {
+            runCatching { AgentService.current?.sessions?.clear() }
+            render()
         }
-        revokeButton = button("Завершити всі сеанси") {
-            runCatching { AgentService.current?.sessions?.clear() }.onFailure {
-                android.widget.Toast.makeText(this, "Не вдалося завершити сеанси.", android.widget.Toast.LENGTH_SHORT).show()
-            }
-            renderStatus()
+        row(actions, getString(R.string.open_grid), false) { cinema("grid") }
+        row(actions, getString(R.string.open_player), false) { cinema("player") }
+        row(actions, autostartTitle(), false) {
+            val enabled = !BootReceiver.enabled(this)
+            BootReceiver.setEnabled(this, enabled)
+            (it.getChildAt(1) as? LinearLayout)?.let { body -> (body.getChildAt(0) as TextView).text = autostartTitle() }
         }
-        controls.addView(serverButton)
-        controls.addView(pinButton)
-        controls.addView(revokeButton)
-        controls.addView(button(getString(R.string.open_grid)) { showCinema("grid") })
-        controls.addView(button(getString(R.string.open_player)) { showCinema("player") })
-        controls.addView(button(getString(R.string.accessibility_settings)) { openSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS) })
-        controls.addView(button(getString(R.string.agent_app_info)) {
-            openSettings(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))
-        })
-        controls.addView(button("Увімкнути клавіатуру BeamDeck") { openSettings(Settings.ACTION_INPUT_METHOD_SETTINGS) })
-        controls.addView(button("Вибрати клавіатуру") {
-            getSystemService(android.view.inputmethod.InputMethodManager::class.java).showInputMethodPicker()
-        })
-        controls.addView(button("Доступ до сповіщень для медіа") { openSettings(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) })
-        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            controls.addView(button("Показувати сповіщення Agent") { requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1) })
-        }
+        right.addView(actions)
 
         if (wide) {
-            body.addView(connection, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(16) })
-            body.addView(controls, LinearLayout.LayoutParams(0, -2, 1f))
+            root.addView(left, LinearLayout.LayoutParams(0, -2, 0.95f).apply { marginEnd = dp(40) })
+            root.addView(right, LinearLayout.LayoutParams(0, -2, 1.05f))
         } else {
-            body.addView(connection)
-            body.addView(controls, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(11) })
+            root.addView(left)
+            root.addView(right, gap(28))
         }
-        root.addView(body)
         setContentView(ScrollView(this).apply { isFillViewport = true; addView(root) })
-        renderStatus()
-        serverButton.requestFocus()
+        requestRuntimePermissions()
+        ensureServer()
+        render()
+        status.getValue("ble").view.requestFocus()
     }
 
     override fun onResume() {
         super.onResume()
         foregroundActivity = WeakReference(this)
-        renderStatus()
-        queueRefresh()
+        main.post(refresh)
     }
 
     override fun onPause() {
         if (foreground === this) foregroundActivity.clear()
-        main.removeCallbacks(refresh)
+        main.removeCallbacksAndMessages(null)
         super.onPause()
     }
 
-    private fun queueRefresh() { main.postDelayed(refresh, 800) }
-    private fun dp(value: Int) = (value * resources.displayMetrics.density + .5f).toInt()
-
-    private fun text(value: String, size: Int, color: Int = muted, bold: Boolean = false) =
-        TextView(this).apply {
-            text = value
-            textSize = size.toFloat()
-            setTextColor(color)
-            if (bold) typeface = Typeface.DEFAULT_BOLD
-        }
-
-    private fun panel(color: Int, radius: Int, stroke: Int? = null) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = dp(radius).toFloat()
-        if (stroke != null) setStroke(dp(2), stroke)
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        ensureServer() // BleLink re-checks permissions on its own tick.
     }
 
-    private fun column(spacing: Int) = object : LinearLayout(this) {
-        override fun addView(child: View, index: Int, params: android.view.ViewGroup.LayoutParams?) {
-            if (childCount > 0 && spacing > 0 && params is LayoutParams && params.topMargin == 0) {
-                params.topMargin = dp(spacing)
-            }
-            super.addView(child, index, params)
-        }
-    }.apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.TOP }
+    private fun requestRuntimePermissions() {
+        val wanted = buildList {
+            if (Build.VERSION.SDK_INT >= 31) { add(Manifest.permission.BLUETOOTH_ADVERTISE); add(Manifest.permission.BLUETOOTH_CONNECT) }
+            if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
+        }.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (wanted.isNotEmpty()) requestPermissions(wanted.toTypedArray(), 1)
+    }
 
-    private fun button(label: String, action: () -> Unit) = Button(this).apply {
-        text = label
-        isAllCaps = false
-        minHeight = dp(42)
-        setPadding(dp(12), dp(4), dp(12), dp(4))
-        gravity = Gravity.START or Gravity.CENTER_VERTICAL
-        setTextColor(ColorStateList(
-            arrayOf(intArrayOf(-android.R.attr.state_enabled), intArrayOf()),
-            intArrayOf(Color.rgb(135, 126, 150), Color.WHITE),
-        ))
-        background = StateListDrawable().apply {
-            addState(intArrayOf(android.R.attr.state_pressed), panel(Color.rgb(91, 62, 128), 11, lilac))
-            addState(intArrayOf(android.R.attr.state_focused), panel(Color.rgb(67, 49, 94), 11, lilac))
-            addState(intArrayOf(), panel(Color.rgb(43, 35, 61), 11))
-        }
-        setOnClickListener { action() }
+    private fun ensureServer() {
+        if (AgentService.current != null) return
+        runCatching { startForegroundService(Intent(this, AgentService::class.java)) }
     }
 
     private fun toggleServer() {
-        val intent = Intent(this, AgentService::class.java)
-        if (AgentService.current != null) {
-            stopService(intent)
-            main.postDelayed({ renderStatus() }, 170)
-        } else {
-            try {
-                startForegroundService(intent)
-                statusText.text = "Запускаємо сервер…"
-            } catch (_: Exception) {
-                statusText.text = "Android відхилив запуск сервера."
-            }
-        }
+        if (AgentService.current != null) stopService(Intent(this, AgentService::class.java)) else ensureServer()
+        main.postDelayed({ render() }, 200)
     }
 
-    private fun renderStatus() {
+    private fun render() {
         val service = AgentService.current
-        val network = service?.listeningOn ?: runCatching { Lan.find(this) }.getOrNull()
         val link = service?.listeningOn?.url
-        val pin = if (link != null) service.sessions.displayedPin() else null
-        serverButton.setText(if (service == null) R.string.start_server else R.string.stop_server)
-        pinButton.isEnabled = service != null
-        revokeButton.isEnabled = service != null
-        statusText.text = service?.message ?: AgentService.lastProblem ?: "Сервер вимкнено"
-        navigationText.setText(when {
-            NavigationService.current != null -> R.string.navigation_connected
-            navigationSelected() -> R.string.navigation_waiting
-            else -> R.string.navigation_disabled
-        })
-        networkText.text = link ?: "IP ${network?.ipv4 ?: "відсутня"}  ·  Порт ${Lan.PORT}"
-        pinText.text = when {
-            pin != null -> "PIN $pin"
-            link != null -> "Створіть новий PIN"
-            else -> "PIN —"
+        val pin = service?.sessions?.displayedPin()
+        pinText.text = pin?.chunked(3)?.joinToString(" ") ?: "— — —"
+        pinHint.text = when {
+            service == null -> AgentService.lastProblem ?: "Приймач вимкнено"
+            pin == null -> "Код сплив. Виберіть «Новий код»."
+            else -> "Діє 10 хвилин. Потрібен один раз для кожного телефона."
         }
+        linkText.text = link ?: "Wi-Fi не під’єднано"
         if (link != qrUrl) {
             qrUrl = link
             qr.visibility = if (link == null) View.GONE else View.VISIBLE
             qr.setImageBitmap(link?.let(::qrBitmap))
         }
+        serverRow.title.text = if (service == null) "Увімкнути приймач" else "Вимкнути приймач"
+
+        val ble = service?.ble
+        set("ble", when (ble?.state) {
+            "advertising" -> (if (ble.connected > 0) "Під’єднано пристроїв: ${ble.connected}" else "Видимий для iPhone") to GREEN
+            "permission_required" -> "Надайте дозвіл «Пристрої поблизу»" to ORANGE
+            "bluetooth_off" -> "Bluetooth вимкнено" to ORANGE
+            "unsupported", "advertise_failed" -> "Прошивка не підтримує BLE-рекламу" to RED
+            else -> "Запускається…" to SECONDARY
+        })
+        set("lan", if (link != null) link.removePrefix("http://") to GREEN else (service?.message ?: "Вимкнено") to ORANGE)
+        set("adb", when (service?.shell?.state) {
+            ShellBridge.State.Ready -> "Працює: фокус, живлення, меню" to GREEN
+            ShellBridge.State.Authorizing -> "Підтвердьте запит «Дозволити налагодження»" to ORANGE
+            else -> "Увімкніть налагодження по мережі" to SECONDARY
+        })
+        set("nav", when {
+            NavigationService.current != null -> "Служба підключена" to GREEN
+            else -> "Увімкніть «BeamDeck · Навігація»" to ORANGE
+        })
+        set("keyboard", when {
+            keyboardSelected() -> "Вибрана" to GREEN
+            keyboardEnabled() -> "Увімкнена, виберіть її" to SECONDARY
+            else -> "Увімкніть клавіатуру BeamDeck" to SECONDARY
+        })
+        set("media", if (mediaAllowed()) "Доступ надано" to GREEN else "Надайте доступ до сповіщень" to SECONDARY)
+    }
+
+    private fun set(key: String, value: Pair<String, Int>) {
+        val row = status.getValue(key)
+        row.detail.text = value.first
+        (row.dot.background as GradientDrawable).setColor(value.second)
+    }
+
+    private fun open(key: String) {
+        when (key) {
+            "ble" -> if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED) {
+                requestRuntimePermissions()
+            } else settings(Settings.ACTION_BLUETOOTH_SETTINGS)
+            "lan" -> settings(Settings.ACTION_WIFI_SETTINGS)
+            "adb" -> {
+                AgentService.current?.shell?.probe()
+                if (AgentService.current?.shell?.state == ShellBridge.State.Off) settings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+            }
+            "nav" -> settings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            "keyboard" -> if (keyboardEnabled()) {
+                getSystemService(android.view.inputmethod.InputMethodManager::class.java).showInputMethodPicker()
+            } else settings(Settings.ACTION_INPUT_METHOD_SETTINGS)
+            "media" -> settings(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+        }
+    }
+
+    private fun keyboardSelected() = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+        ?.substringBefore('/') == packageName
+
+    private fun keyboardEnabled() = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_INPUT_METHODS)
+        .orEmpty().split(':').any { it.substringBefore('/') == packageName }
+
+    private fun mediaAllowed(): Boolean = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+        .orEmpty().split(':').any { ComponentName.unflattenFromString(it)?.packageName == packageName }
+
+    private fun autostartTitle() = if (BootReceiver.enabled(this)) "Автозапуск: увімкнено" else "Автозапуск: вимкнено"
+
+    private fun cinema(mode: String) = startActivity(Intent(this, CinemaActivity::class.java).putExtra("mode", mode))
+
+    private fun settings(action: String, uri: Uri? = null) {
+        try {
+            startActivity(Intent(action, uri))
+        } catch (error: RuntimeException) {
+            if (error !is ActivityNotFoundException && error !is SecurityException) throw error
+            android.widget.Toast.makeText(this, "Відкрийте цей розділ у налаштуваннях Android.", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
+    // ---- view helpers ----
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density + .5f).toInt()
+    private fun gap(top: Int) = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(top) }
+    private fun column() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
+
+    private fun text(value: String, size: Int, color: Int, style: Int = Typeface.NORMAL) = TextView(this).apply {
+        text = value
+        textSize = size.toFloat()
+        setTextColor(color)
+        typeface = Typeface.create("sans-serif", style)
+    }
+
+    private fun header(value: String) = text(value.uppercase(), 13, SECONDARY, Typeface.BOLD).apply {
+        letterSpacing = 0.04f
+        setPadding(dp(16), 0, 0, dp(8))
+    }
+
+    private fun group() = column().apply {
+        background = rounded(GROUPED, 16)
+        clipToOutline = true
+    }
+
+    private fun row(parent: LinearLayout, title: String, withDot: Boolean, action: (LinearLayout) -> Unit): Row {
+        val view = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(54)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            isFocusable = true
+            isClickable = true
+        }
+        val dot = View(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(SECONDARY) } }
+        view.addView(dot, LinearLayout.LayoutParams(dp(10), dp(10)).apply { marginEnd = dp(14) })
+        dot.visibility = if (withDot) View.VISIBLE else View.GONE
+        val body = column()
+        val titleView = text(title, 17, LABEL)
+        val detail = text("", 14, SECONDARY)
+        body.addView(titleView)
+        if (withDot) body.addView(detail)
+        view.addView(body, LinearLayout.LayoutParams(0, -2, 1f))
+        view.addView(text("›", 22, TERTIARY))
+        // tvOS-style focus: the focused row lifts and turns light.
+        view.setOnFocusChangeListener { v, focused ->
+            v.background = if (focused) rounded(Color.WHITE, 12) else null
+            titleView.setTextColor(if (focused) Color.BLACK else LABEL)
+            detail.setTextColor(if (focused) Color.rgb(60, 60, 67) else SECONDARY)
+            v.animate().scaleX(if (focused) 1.02f else 1f).scaleY(if (focused) 1.02f else 1f).setDuration(120).start()
+        }
+        view.setOnClickListener { action(view) }
+        if (parent.childCount > 0) {
+            parent.addView(View(this).apply { setBackgroundColor(SEPARATOR) },
+                LinearLayout.LayoutParams(-1, 1).apply { marginStart = dp(if (withDot) 40 else 16) })
+        }
+        parent.addView(view, LinearLayout.LayoutParams(-1, -2))
+        return Row(view, titleView, detail, dot)
     }
 
     private fun qrBitmap(url: String): Bitmap {
@@ -223,29 +311,33 @@ class MainActivity : Activity() {
         return Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
     }
 
-    private fun showCinema(mode: String) {
-        startActivity(Intent(this, CinemaActivity::class.java).putExtra("mode", mode))
-    }
+    companion object {
+        // Apple dark-mode system colours.
+        private val BACKGROUND = Color.rgb(0, 0, 0)
+        private val GROUPED = Color.rgb(28, 28, 30)
+        private val LABEL = Color.WHITE
+        private val SECONDARY = Color.argb(153, 235, 235, 245)
+        private val TERTIARY = Color.argb(76, 235, 235, 245)
+        private val SEPARATOR = Color.argb(90, 84, 84, 88)
+        private val GREEN = Color.rgb(48, 209, 88)
+        private val ORANGE = Color.rgb(255, 159, 10)
+        private val RED = Color.rgb(255, 69, 58)
 
-    private fun navigationSelected(): Boolean {
-        val service = ComponentName(this, NavigationService::class.java)
-        val enabled = runCatching {
-            Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-        }.getOrNull()
-        return enabled.orEmpty().split(':').any { ComponentName.unflattenFromString(it) == service }
+        private var foregroundActivity = WeakReference<MainActivity>(null)
+        internal val foreground: MainActivity? get() = foregroundActivity.get()
     }
+}
 
-    private fun openSettings(action: String, uri: Uri? = null) {
-        try {
-            startActivity(Intent(action, uri))
-        } catch (error: RuntimeException) {
-            if (error !is ActivityNotFoundException && error !is SecurityException) throw error
-            android.widget.Toast.makeText(this, "Відкрийте цей розділ через налаштування Android.", android.widget.Toast.LENGTH_LONG).show()
-        }
+/** Starts the receiver after the projector boots, like a stock remote receiver. */
+class BootReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED || !enabled(context)) return
+        runCatching { context.startForegroundService(Intent(context, AgentService::class.java)) }
     }
 
     companion object {
-        private var foregroundActivity = WeakReference<MainActivity>(null)
-        internal val foreground: MainActivity? get() = foregroundActivity.get()
+        fun enabled(context: Context) = context.getSharedPreferences("agent", Context.MODE_PRIVATE).getBoolean("autostart", true)
+        fun setEnabled(context: Context, value: Boolean) =
+            context.getSharedPreferences("agent", Context.MODE_PRIVATE).edit().putBoolean("autostart", value).apply()
     }
 }

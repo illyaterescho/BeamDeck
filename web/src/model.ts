@@ -10,7 +10,8 @@ export type CapabilityKey = Command | 'volume' | 'launch' | 'sleep'
 export type Capability = { available: true } | {
   available: false
   reason: 'unsupported' | 'accessibility_required' | 'media_access_required' |
-    'no_media' | 'media_action_unavailable' | 'fixed_volume' | 'launch_blocked'
+    'no_media' | 'media_action_unavailable' | 'fixed_volume' | 'launch_blocked' |
+    'adb_required' | 'adb_authorizing' | 'learn_required' | 'no_focus'
 }
 export type Capabilities = Record<CapabilityKey, Capability>
 export type Device = { model: string; manufacturer: string; android: string; api: number }
@@ -60,6 +61,10 @@ export const capabilityText: Record<Extract<Capability, { available: false }>['r
   media_action_unavailable: 'Поточний плеєр не надає цю команду.',
   fixed_volume: 'Android повідомив, що рівень гучності фіксований.',
   launch_blocked: 'Відкрийте Agent або ввімкніть спеціальні можливості BeamDeck для запуску програм у фоні.',
+  adb_required: 'Увімкніть налагодження по мережі на проєкторі, щоб BeamDeck натискав системні кнопки.',
+  adb_authorizing: 'Підтвердьте запит «Дозволити налагодження» на екрані проєктора.',
+  learn_required: 'Навчіть цю кнопку з пульта проєктора в програмі BeamDeck.',
+  no_focus: 'На екрані проєктора немає елемента у фокусі.',
 }
 
 export function unavailable(capability?: Capability) {

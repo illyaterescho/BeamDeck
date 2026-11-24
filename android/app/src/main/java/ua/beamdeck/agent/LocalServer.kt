@@ -52,11 +52,13 @@ internal class LocalServer(
     private val controls: ProjectorControls,
     private val geometry: GeometryController,
     private val projector: SystemProjectorController,
+    private val router: CommandRouter,
+    private val shell: ShellBridge,
 ) {
     private val liveSlots = Semaphore(4)
     private val editorSlots = Semaphore(3)
     private val requests = RequestBudget()
-    private val lumina = LuminaReceiver(lan)
+    private val screenSlot = Semaphore(1)
 
     private val engine = embeddedServer(CIO, host = lan.ipv4, port = Lan.PORT, configure = {
         connectionIdleTimeoutSeconds = 10
@@ -135,29 +137,34 @@ internal class LocalServer(
                     call.safe {
                         authenticated()
                         val command = body("command").string("command", COMMAND)
-                        val receiver = lumina.discover()
-                        if (receiver?.supports(command) == true) {
-                            val before = if (command in LuminaReceiver.volume) device { controls.volumeStatus() } else null
-                            val result = lumina.submit(receiver, command) { authenticated() }.json()
-                            if (before != null) {
-                                var updated = device { controls.volumeStatus() }
-                                repeat(3) {
-                                    if (updated.toString() == before.toString()) {
-                                        delay(30)
-                                        updated = device { controls.volumeStatus() }
-                                    }
-                                }
-                                result.put("volume", updated)
-                            }
-                            result
-                        } else {
-                            device {
-                                if (command in LuminaReceiver.focus) throw ApiProblem(409, "unsupported")
-                                val result = controls.command(command).json()
-                                if (command in LuminaReceiver.volume) result.put("volume", controls.volumeStatus())
-                                result
-                            }
+                        withContext(Dispatchers.IO) { router.handle("key", JSONObject().put("key", command)) }
+                    }
+                }
+                post("/rpc") {
+                    call.safe {
+                        authenticated()
+                        val input = body(exact = false)
+                        val op = input.string("op", Regex("[a-zA-Z]{2,20}"))
+                        if (op == "pair" || op == "auth") throw ApiProblem(400, "bad_request")
+                        withContext(Dispatchers.IO) { router.handle(op, input) }
+                    }
+                }
+                get("/screen.jpg") {
+                    try {
+                        call.authenticated()
+                        if (!screenSlot.tryAcquire()) throw ApiProblem(429, "busy")
+                        val jpeg = try {
+                            withContext(Dispatchers.IO) { ScreenShot.jpeg(shell.screenshot()) }
+                        } finally {
+                            screenSlot.release()
                         }
+                        call.respondBytes(jpeg, ContentType.Image.JPEG)
+                    } catch (problem: ApiProblem) {
+                        call.problem(problem)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        call.problem(ApiProblem(503, "adb_lost"))
                     }
                 }
                 post("/volume") {
@@ -313,36 +320,11 @@ internal class LocalServer(
 
     private suspend fun ApplicationCall.readSnapshot(): JSONObject {
         authenticated()
-        val receiver = lumina.discover()
-        return device {
-            val snapshot = controls.snapshot()
-            val board = projector.status()
-            val capabilities = snapshot.getJSONObject("capabilities")
-            if (receiver != null) {
-                for (name in LuminaReceiver.navigation + LuminaReceiver.volume) {
-                    if (receiver.supports(name)) capabilities.put(name, JSONObject().put("available", true))
-                }
-                if (LuminaReceiver.navigation.any(receiver::supports)) board.put("navigation", "lumina")
-            }
-            for (name in LuminaReceiver.focus) {
-                val available = receiver?.supports(name) == true
-                capabilities.put(name, JSONObject().put("available", available).apply {
-                    if (!available) put("reason", "unsupported")
-                })
-                if (available) board.put("focus", "lumina")
-            }
-            snapshot.put("geometry", geometry.geometry.json())
-                .put("projector", board).put("cinema", geometry.loadSettings().json())
-                .put("player", CinemaActivity.current?.features() ?: JSONObject()
-                    .put("ready", false).put("effects", false).put("audio", false).put("compression", false)
-                    .put("sceneBrightness", JSONObject.NULL).put("fps", 0).put("reduced", false))
-        }
+        return withContext(Dispatchers.IO) { router.status() }
     }
 
     fun start() { engine.start(wait = false) }
-    fun stop() {
-        try { engine.stop(100, 500) } finally { lumina.close() }
-    }
+    fun stop() { engine.stop(100, 500) }
 
     private fun ApplicationCall.sessionToken() = request.cookies[COOKIE]
 
@@ -383,7 +365,7 @@ internal class LocalServer(
         }
     }
 
-    private suspend fun ApplicationCall.body(vararg keys: String): JSONObject {
+    private suspend fun ApplicationCall.body(vararg keys: String, exact: Boolean = true): JSONObject {
         val length = request.contentLength()
         if (request.headers[HttpHeaders.TransferEncoding] != null || length == null ||
             length !in 2..MAX_BODY || !request.contentType().match(ContentType.Application.Json)
@@ -394,7 +376,7 @@ internal class LocalServer(
         try {
             val tokener = JSONTokener(bytes.decodeToString(throwOnInvalidSequence = true))
             val value = tokener.nextValue() as? JSONObject ?: throw ApiProblem(400, "bad_request")
-            if (tokener.nextClean() != '\u0000' || value.keys().asSequence().toSet() != keys.toSet()) {
+            if (tokener.nextClean() != '\u0000' || exact && value.keys().asSequence().toSet() != keys.toSet()) {
                 throw ApiProblem(400, "bad_request")
             }
             return value

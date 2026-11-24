@@ -11,8 +11,8 @@ android {
         applicationId = "ua.beamdeck.agent"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "0.2.2"
+        versionCode = 5
+        versionName = "0.3.0"
     }
 
     compileOptions {
@@ -23,6 +23,10 @@ android {
 
 kotlin {
     jvmToolchain(17)
+}
+
+tasks.withType<Test>().configureEach {
+    System.getProperty("bleOut")?.let { systemProperty("bleOut", it) }
 }
 
 val webDist = rootProject.layout.projectDirectory.dir("../web/dist")
@@ -46,4 +50,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
     implementation("org.slf4j:slf4j-nop:1.7.36")
     implementation("com.google.zxing:core:3.5.3")
+    implementation("dev.mobile:dadb:1.2.10")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
