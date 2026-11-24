@@ -10,6 +10,7 @@
 		00034BF67D5D705166E329CF /* BeamDeckApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7F484289E12456C49E39ED /* BeamDeckApp.swift */; };
 		151E5B1167F2628A2D1DEE72 /* Wire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37F97E0ADBD9D6D7DE4DAFD7 /* Wire.swift */; };
 		1F5A98A0A6A83011435DE9AC /* RemoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFF9B65F92600CD9CB9FFC19 /* RemoteView.swift */; };
+		5B4DA8AFD0E9505B599411AD /* LuminaLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0066DA61495DE2F49A90C82E /* LuminaLink.swift */; };
 		6BCF4B69999DD91550B7E591 /* BeamLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAAA7368F92F7FB1496DF957 /* BeamLink.swift */; };
 		8CD94F5F1F086A19D0A57E52 /* ConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2CD05FEA66AA844A6E4C06D /* ConnectView.swift */; };
 		AFE56329FB9386024463C83B /* ProjectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C2BDC4F27466560C738B4B /* ProjectorView.swift */; };
@@ -18,6 +19,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0066DA61495DE2F49A90C82E /* LuminaLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LuminaLink.swift; sourceTree = "<group>"; };
 		1C7F484289E12456C49E39ED /* BeamDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeamDeckApp.swift; sourceTree = "<group>"; };
 		37F97E0ADBD9D6D7DE4DAFD7 /* Wire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Wire.swift; sourceTree = "<group>"; };
 		7C412F4AFE98532C58B91DCC /* Remote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Remote.swift; sourceTree = "<group>"; };
@@ -63,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				BAAA7368F92F7FB1496DF957 /* BeamLink.swift */,
+				0066DA61495DE2F49A90C82E /* LuminaLink.swift */,
 				37F97E0ADBD9D6D7DE4DAFD7 /* Wire.swift */,
 			);
 			path = Link;
@@ -149,6 +152,7 @@
 				00034BF67D5D705166E329CF /* BeamDeckApp.swift in Sources */,
 				6BCF4B69999DD91550B7E591 /* BeamLink.swift in Sources */,
 				8CD94F5F1F086A19D0A57E52 /* ConnectView.swift in Sources */,
+				5B4DA8AFD0E9505B599411AD /* LuminaLink.swift in Sources */,
 				C0AF043B15C97B06E719D9B6 /* PadViews.swift in Sources */,
 				AFE56329FB9386024463C83B /* ProjectorView.swift in Sources */,
 				BDBC5F14D920476F188CB069 /* Remote.swift in Sources */,
@@ -258,7 +262,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 7;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -279,7 +283,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -325,7 +329,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 7;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -340,7 +344,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

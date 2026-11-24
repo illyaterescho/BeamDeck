@@ -16,12 +16,40 @@ struct ProjectorView: View {
         let status = remote.status
         NavigationStack {
             Form {
-                Section("Підключення") {
-                    LabeledContent("Проєктор", value: link.connectedName ?? status.model)
-                    LabeledContent("Android", value: status.android)
-                    LabeledContent("Wi-Fi", value: status.lan?.replacingOccurrences(of: "http://", with: "") ?? "Не під’єднано")
+                if remote.firmware {
+                    Section {
+                        LabeledContent("Приймач", value: remote.lumina.connectedName ?? "Вбудований у проєктор")
+                        Button("Від’єднатися", role: .destructive) { remote.lumina.disconnect() }
+                    } header: {
+                        Text("Підключення")
+                    } footer: {
+                        Text("Команди виконує вбудований приймач проєктора. Доступні навігація, фокус, гучність, живлення й медіа. Запуск програм і живе зображення екрана потребують приймача BeamDeck.")
+                    }
+                } else {
+                    Section("Підключення") {
+                        LabeledContent("Проєктор", value: link.connectedName ?? status.model)
+                        LabeledContent("Android", value: status.android)
+                        LabeledContent("Wi-Fi", value: status.lan?.replacingOccurrences(of: "http://", with: "") ?? "Не під’єднано")
+                    }
                 }
 
+                if !remote.firmware {
+                beamSections(status)
+                }
+            }
+            .formStyle(.grouped)
+            .navigationTitle("Проєктор")
+            .task { if !remote.firmware { await loadKeymap() } }
+            .onChange(of: status.learning?["state"] as? String) { _, _ in Task { await loadKeymap() } }
+            .confirmationDialog("Забути проєктор?", isPresented: $confirmForget, titleVisibility: .visible) {
+                Button("Забути", role: .destructive) { link.forgetCurrent() }
+            } message: {
+                Text("Для повторного підключення знадобиться код з екрана проєктора.")
+            }
+        }
+    }
+
+    @ViewBuilder private func beamSections(_ status: ProjectorStatus) -> some View {
                 Section {
                     Health(title: "Системні кнопки", detail: adbText(status.adb), ok: status.adb == "ready",
                            waiting: status.adb == "authorizing")
@@ -81,17 +109,6 @@ struct ProjectorView: View {
                 Section {
                     Button("Від’єднатися й забути цей проєктор", role: .destructive) { confirmForget = true }
                 }
-            }
-            .formStyle(.grouped)
-            .navigationTitle("Проєктор")
-            .task { await loadKeymap() }
-            .onChange(of: status.learning?["state"] as? String) { _, _ in Task { await loadKeymap() } }
-            .confirmationDialog("Забути проєктор?", isPresented: $confirmForget, titleVisibility: .visible) {
-                Button("Забути", role: .destructive) { link.forgetCurrent() }
-            } message: {
-                Text("Для повторного підключення знадобиться код з екрана проєктора.")
-            }
-        }
     }
 
     private func adbText(_ state: String) -> String {

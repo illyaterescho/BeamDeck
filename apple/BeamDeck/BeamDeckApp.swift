@@ -9,6 +9,7 @@ struct BeamDeckApp: App {
             RootView()
                 .environmentObject(remote)
                 .environmentObject(remote.link)
+                .environmentObject(remote.lumina)
                 #if os(macOS)
                 .frame(minWidth: 380, idealWidth: 420, minHeight: 720, idealHeight: 820)
                 #endif
@@ -22,6 +23,7 @@ struct BeamDeckApp: App {
 struct RootView: View {
     @EnvironmentObject private var remote: Remote
     @EnvironmentObject private var link: BeamLink
+    @EnvironmentObject private var lumina: LuminaLink
 
     private var showRemote: Bool {
         switch link.phase {
@@ -33,9 +35,12 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if showRemote || remote.demo { MainTabs() } else { ConnectView() }
+            if remote.firmware { MainTabs(firmwareOnly: true) }
+            else if showRemote || remote.demo { MainTabs() }
+            else { ConnectView() }
         }
         .animation(.smooth, value: showRemote)
+        .animation(.smooth, value: remote.firmware)
         .overlay(alignment: .bottom) {
             if let notice = remote.notice {
                 Text(notice)
@@ -55,12 +60,17 @@ struct RootView: View {
 }
 
 struct MainTabs: View {
+    /// The firmware receiver gives no Wi-Fi, so app list and screen preview are hidden in that mode.
+    var firmwareOnly = false
+
     var body: some View {
         TabView {
             RemoteView().tabItem { Label("Пульт", systemImage: "av.remote") }
             TouchpadView().tabItem { Label("Тачпад", systemImage: "hand.point.up.left") }
-            AppsView().tabItem { Label("Програми", systemImage: "square.grid.2x2") }
-            ScreenView().tabItem { Label("Екран", systemImage: "tv") }
+            if !firmwareOnly {
+                AppsView().tabItem { Label("Програми", systemImage: "square.grid.2x2") }
+                ScreenView().tabItem { Label("Екран", systemImage: "tv") }
+            }
             ProjectorView().tabItem { Label("Проєктор", systemImage: "videoprojector") }
         }
     }

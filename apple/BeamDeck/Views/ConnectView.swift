@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ConnectView: View {
     @EnvironmentObject private var link: BeamLink
+    @EnvironmentObject private var lumina: LuminaLink
     @State private var pin = ""
     @State private var pairing = false
     @State private var pinError: String?
@@ -32,15 +33,47 @@ struct ConnectView: View {
                     pinSection
                 } else {
                     nearbySection
+                    firmwareSection
                 }
             }
             .navigationTitle("BeamDeck")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .onAppear { if link.phase == .idle { link.scan() } }
+            .onAppear {
+                if link.phase == .idle { link.scan() }
+                lumina.scan()
+            }
             .onChange(of: link.phase) { _, phase in
                 if phase == .needsPin { pin = ""; pinFocused = true }
+            }
+        }
+    }
+
+    /// The projector's own built-in receiver (Lumina-compatible): no code, no projector-side setup.
+    @ViewBuilder private var firmwareSection: some View {
+        if !lumina.nearby.isEmpty {
+            Section {
+                ForEach(lumina.nearby.sorted { $0.rssi > $1.rssi }) { projector in
+                    Button {
+                        lumina.connect(projector.id)
+                    } label: {
+                        HStack {
+                            Label(projector.name, systemImage: "wifi.router")
+                            Spacer()
+                            if lumina.phase == .connecting && lumina.connectedName == projector.name {
+                                ProgressView()
+                            } else {
+                                SignalBars(rssi: projector.rssi)
+                            }
+                        }
+                    }
+                    .foregroundStyle(.primary)
+                }
+            } header: {
+                Text("Вбудований приймач проєктора")
+            } footer: {
+                Text("Якщо навігацію BeamDeck блокує прошивка, підключіться сюди — стрілки, OK і фокус працюватимуть одразу, без коду.")
             }
         }
     }

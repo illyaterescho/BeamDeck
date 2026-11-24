@@ -40,6 +40,7 @@ struct LaunchableApp: Identifiable, Hashable {
 @MainActor
 final class Remote: ObservableObject {
     let link = BeamLink()
+    let lumina = LuminaLink()
     @Published var status = ProjectorStatus()
     @Published var notice: String?
     @Published var apps: [LaunchableApp] = []
@@ -56,8 +57,12 @@ final class Remote: ObservableObject {
         if demo { status = ProjectorStatus(raw: Self.sample) }
         link.onStatus = { [weak self] in self?.status = ProjectorStatus(raw: $0) }
         link.onReady = { [weak self] in Task { await self?.refresh() } }
+        // Firmware receiver: no Wi-Fi status, so show a fixed capability set the UI can light up.
+        lumina.onReady = { [weak self] in self?.status = ProjectorStatus(raw: Self.luminaStatus) }
     }
 
+    /// True while driving the projector's built-in receiver instead of a BeamDeck receiver.
+    var firmware: Bool { lumina.connected }
     var ready: Bool { link.phase == .ready }
 
     func refresh() async {
@@ -67,6 +72,7 @@ final class Remote: ObservableObject {
     /// Fire-and-report: errors surface as a short notice instead of an alert.
     func send(_ op: String, _ params: [String: Any] = [:]) {
         haptic += 1
+        if firmware { luminaSend(op, params); return }
         Task {
             do {
                 let reply = try await call(op, params)
@@ -82,7 +88,42 @@ final class Remote: ObservableObject {
     }
 
     func key(_ name: String, long: Bool = false) {
+        if firmware {
+            haptic += 1
+            guard let packet = Lumina.packet(forKey: name, long: long) else {
+                show("Ця кнопка недоступна для цього проєктора.")
+                return
+            }
+            lumina.send(packet)
+            return
+        }
         send("key", long ? ["key": name, "long": true] : ["key": name])
+    }
+
+    /// Routes an op to the firmware receiver's byte protocol. Returns silently for anything it can't do.
+    private func luminaSend(_ op: String, _ params: [String: Any]) {
+        switch op {
+        case "click": lumina.send([7, 2])
+        case "scroll":
+            let dy = (params["dy"] as? Double) ?? 0
+            lumina.send([7, 4, UInt8(bitPattern: Int8(max(-127, min(127, Int(dy / 40)))))])
+        case "text":
+            switch params["action"] as? String {
+            case "text": if let t = params["text"] as? String { lumina.sendText(t) }
+            case "delete": lumina.send([6, 1])
+            case "enter": lumina.send([6, 2])
+            default: break
+            }
+        case "open":
+            if (params["destination"] as? String) == "url", let value = params["value"] as? String {
+                lumina.sendText(value) // deep-link fallback: type the URL into the focused field
+            } else {
+                show("Доступно лише з приймачем BeamDeck.")
+            }
+        case "volume", "sleep", "launch", "scene", "adb", "learn", "forget":
+            show("Доступно лише з приймачем BeamDeck.")
+        default: break
+        }
     }
 
     @discardableResult
@@ -110,6 +151,13 @@ final class Remote: ObservableObject {
     private func flushPointer() {
         guard !pointerInFlight, pointer != .zero else { return }
         let delta = pointer
+        if firmware {
+            pointer = .zero
+            let dx = Int8(max(-127, min(127, Int(delta.width))))
+            let dy = Int8(max(-127, min(127, Int(delta.height))))
+            lumina.send([7, 1, UInt8(bitPattern: dx), UInt8(bitPattern: dy)])
+            return
+        }
         pointer = .zero
         pointerInFlight = true
         Task {
@@ -132,6 +180,23 @@ final class Remote: ObservableObject {
             "volumeUp", "volumeDown", "mute", "playPause", "next", "previous", "focusUp", "focusDown", "pointer", "screen",
             "standby", "wakeup", "power"].map { ($0, ["available": true]) })
             .merging(["autoFocus": ["available": false, "reason": "learn_required"]]) { $1 },
+        "learning": NSNull(),
+    ]
+
+    /// Capabilities the firmware receiver provides; volume is relative-only, so the slider stays off.
+    private static let luminaStatus: [String: Any] = [
+        "device": ["model": "Проєктор", "android": ""],
+        "volume": ["current": 0, "min": 0, "max": 100, "muted": false],
+        "media": ["playing": NSNull(), "app": NSNull()],
+        "receiver": ["adb": "off", "accessibility": false],
+        "projector": ["keyboard": "ready"],
+        "capabilities": Dictionary(uniqueKeysWithValues: Lumina.supported.map { ($0, ["available": true]) })
+            .merging([
+                "volume": ["available": false, "reason": "unsupported"],
+                "sleep": ["available": false, "reason": "unsupported"],
+                "launch": ["available": false, "reason": "unsupported"],
+                "screen": ["available": false, "reason": "unsupported"],
+            ]) { $1 },
         "learning": NSNull(),
     ]
 
