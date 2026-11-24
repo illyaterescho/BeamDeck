@@ -27,5 +27,5 @@ class BeamDeckApplication : Application() {
 }
 
 internal object BuildConfigVersion {
-    const val name = "0.3.1"
+    const val name = "0.3.2"
 }

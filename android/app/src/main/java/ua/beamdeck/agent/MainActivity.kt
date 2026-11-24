@@ -235,14 +235,25 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun keyboardSelected() = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
-        ?.substringBefore('/') == packageName
+    // Android 14 blocks reading most Settings.Secure keys for targetSdk 34: use the public APIs.
+    private fun keyboardSelected() = runCatching {
+        Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)?.substringBefore('/') == packageName
+    }.getOrDefault(false)
 
-    private fun keyboardEnabled() = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_INPUT_METHODS)
-        .orEmpty().split(':').any { it.substringBefore('/') == packageName }
+    private fun keyboardEnabled() = runCatching {
+        getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            .enabledInputMethodList.any { it.packageName == packageName }
+    }.getOrDefault(false)
 
-    private fun mediaAllowed(): Boolean = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-        .orEmpty().split(':').any { ComponentName.unflattenFromString(it)?.packageName == packageName }
+    private fun mediaAllowed(): Boolean = runCatching {
+        val component = ComponentName(this, MediaAccessService::class.java)
+        if (Build.VERSION.SDK_INT >= 27) {
+            getSystemService(android.app.NotificationManager::class.java).isNotificationListenerAccessGranted(component)
+        } else {
+            Settings.Secure.getString(contentResolver, "enabled_notification_listeners").orEmpty()
+                .split(':').any { ComponentName.unflattenFromString(it) == component }
+        }
+    }.getOrDefault(false)
 
     private fun autostartTitle() = if (BootReceiver.enabled(this)) "Автозапуск: увімкнено" else "Автозапуск: вимкнено"
 

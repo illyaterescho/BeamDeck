@@ -73,7 +73,7 @@ internal class SystemProjectorController(private val context: Context) {
     }
 
     fun keyboardReason(): String? {
-        val input = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+        val input = runCatching { Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD) }.getOrNull()
         if (input?.substringBefore('/') != context.packageName) return "keyboard_required"
         return BeamKeyboard.current?.let { it.reason() } ?: if (BeamKeyboard.current != null) null else "field_required"
     }
