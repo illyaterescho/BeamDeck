@@ -1,0 +1,12 @@
+.DS_Store
+web/node_modules/
+web/dist/
+web/beamdeck-demo.html
+android/.gradle/
+android/.kotlin/
+android/.idea/
+android/local.properties
+android/build/
+android/app/build/
+*.iml
+web/.test-build/
