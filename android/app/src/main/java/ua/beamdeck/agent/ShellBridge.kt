@@ -79,7 +79,15 @@ internal class ShellBridge(context: Context) {
     /** Probes in the background; callers read [state]. */
     fun probe() {
         if (adb != null || probing.getAndSet(true)) return
-        Thread({ try { connect() } finally { probing.set(false) } }, "beamdeck-adb-connect").apply { isDaemon = true }.start()
+        Thread({
+            try {
+                connect()
+            } catch (_: Throwable) {
+                state = State.Off // a library Error must never take the whole receiver down
+            } finally {
+                probing.set(false)
+            }
+        }, "beamdeck-adb-connect").apply { isDaemon = true }.start()
     }
 
     private val probing = java.util.concurrent.atomic.AtomicBoolean(false)

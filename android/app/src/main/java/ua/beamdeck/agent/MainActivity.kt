@@ -48,6 +48,17 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.decorView.setBackgroundColor(BACKGROUND)
+        // Show the previous crash before building anything that might crash again.
+        val crash = BeamDeckApplication.crashFile(this)
+        if (crash.isFile) { showCrash(crash.readText()); return }
+        try {
+            buildScreen()
+        } catch (error: Throwable) {
+            showCrash("Помилка під час відкриття екрана\n\n" + android.util.Log.getStackTraceString(error))
+        }
+    }
+
+    private fun buildScreen() {
         val wide = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val root = LinearLayout(this).apply {
             orientation = if (wide) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
@@ -115,7 +126,8 @@ class MainActivity : Activity() {
             root.addView(right, gap(28))
         }
         setContentView(ScrollView(this).apply { isFillViewport = true; addView(root) })
-        requestRuntimePermissions()
+        // Permissions are asked only from the Bluetooth row: some TV firmwares open an invisible
+        // permission window on launch that swallows the remote, which looks like the app never opened.
         ensureServer()
         render()
         status.getValue("ble").view.requestFocus()
@@ -124,7 +136,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         foregroundActivity = WeakReference(this)
-        main.post(refresh)
+        if (::pinText.isInitialized) main.post(refresh)
     }
 
     override fun onPause() {
@@ -176,7 +188,7 @@ class MainActivity : Activity() {
         val ble = service?.ble
         set("ble", when (ble?.state) {
             "advertising" -> (if (ble.connected > 0) "Під’єднано пристроїв: ${ble.connected}" else "Видимий для iPhone") to GREEN
-            "permission_required" -> "Надайте дозвіл «Пристрої поблизу»" to ORANGE
+            "permission_required" -> "Натисніть, щоб дозволити «Пристрої поблизу»" to ORANGE
             "bluetooth_off" -> "Bluetooth вимкнено" to ORANGE
             "unsupported", "advertise_failed" -> "Прошивка не підтримує BLE-рекламу" to RED
             else -> "Запускається…" to SECONDARY
@@ -243,6 +255,24 @@ class MainActivity : Activity() {
             if (error !is ActivityNotFoundException && error !is SecurityException) throw error
             android.widget.Toast.makeText(this, "Відкрийте цей розділ у налаштуваннях Android.", android.widget.Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun showCrash(report: String) {
+        val box = column().apply { setPadding(dp(48), dp(36), dp(48), dp(36)) }
+        box.addView(text("BeamDeck зупинився минулого разу", 26, LABEL, Typeface.BOLD))
+        box.addView(text("Сфотографуйте цей екран і надішліть розробнику. Потім натисніть «Продовжити».", 15, SECONDARY), gap(8))
+        box.addView(text(report.lines().take(28).joinToString("\n"), 12, LABEL).apply {
+            typeface = Typeface.MONOSPACE
+            background = rounded(GROUPED, 14)
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+        }, gap(16))
+        val group = group()
+        row(group, "Продовжити", false) {
+            BeamDeckApplication.crashFile(this).delete()
+            recreate()
+        }.view.requestFocus()
+        box.addView(group, gap(16))
+        setContentView(ScrollView(this).apply { addView(box) })
     }
 
     // ---- view helpers ----
