@@ -9,9 +9,18 @@ struct ProjectorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Підключення") {
+                Section {
                     LabeledContent("Проєктор", value: remote.projectorName)
-                    LabeledContent("Стан", value: remote.connected ? "Під’єднано по Bluetooth" : "Підключаємося…")
+                    LabeledContent("Стан", value: phaseText)
+                    LabeledContent("Команд надіслано", value: "\(lumina.sentCount)")
+                    LabeledContent("Підтверджено проєктором", value: "\(lumina.ackedCount)")
+                    if let error = lumina.lastError {
+                        LabeledContent("Остання помилка", value: error).foregroundStyle(.red)
+                    }
+                } header: {
+                    Text("Підключення")
+                } footer: {
+                    Text("Якщо «Підтверджено» росте, а проєктор не реагує, закрийте Lumina Go на інших телефонах.")
                 }
 
                 Section {
@@ -47,6 +56,16 @@ struct ProjectorView: View {
             } message: {
                 Text("Позначки, які команди працюють, збережуться.")
             }
+        }
+    }
+
+    private var phaseText: String {
+        switch lumina.phase {
+        case .ready: "Під’єднано по Bluetooth"
+        case .connecting: "Підключаємося…"
+        case .scanning: "Шукаємо проєктор…"
+        case .idle: "Не під’єднано"
+        case .failed(let message): message
         }
     }
 

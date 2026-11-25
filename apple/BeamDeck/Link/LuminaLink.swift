@@ -9,10 +9,18 @@ final class LuminaLink: NSObject, ObservableObject {
     enum Phase: Equatable { case idle, scanning, connecting, ready, failed(String) }
 
     @Published private(set) var phase: Phase = .idle {
-        didSet { if phase != oldValue { onPhaseChange?() } }
+        didSet {
+            guard phase != oldValue else { return }
+            print("[BeamDeck] phase", String(describing: phase))
+            onPhaseChange?()
+        }
     }
     @Published private(set) var nearby: [NearbyProjector] = []
     @Published private(set) var connectedName: String?
+    /// Diagnostics shown on the Projector tab.
+    @Published private(set) var sentCount = 0
+    @Published private(set) var ackedCount = 0
+    @Published private(set) var lastError: String?
 
     var onPhaseChange: (() -> Void)?
     var onDiscovery: (() -> Void)?
@@ -134,8 +142,10 @@ final class LuminaLink: NSObject, ObservableObject {
         pumpWrites()
     }
 
+    /// Always write with response when the receiver allows it: verified on an HY350 MAX that it acts on
+    /// acknowledged writes, and an acknowledgement also tells us the command really arrived.
     private func writeType(_ characteristic: CBCharacteristic) -> CBCharacteristicWriteType {
-        characteristic.properties.contains(.writeWithoutResponse) ? .withoutResponse : .withResponse
+        characteristic.properties.contains(.write) ? .withResponse : .withoutResponse
     }
 
     private func pumpWrites() {
@@ -145,6 +155,9 @@ final class LuminaLink: NSObject, ObservableObject {
             guard let packet = outbound.isEmpty ? nextMotion() : outbound.removeFirst() else { return }
             writing = type == .withResponse
             peripheral.writeValue(packet, for: cmd, type: type)
+            sentCount += 1
+            print("[BeamDeck] write", packet.map { String(format: "%02x", $0) }.joined(separator: " "),
+                  type == .withResponse ? "(ack)" : "(no ack)")
             if writing { return }
         }
     }
@@ -260,10 +273,13 @@ extension LuminaLink: CBPeripheralDelegate {
         MainActor.assumeIsolated {
             guard peripheral == self.peripheral, characteristic.uuid == cmdId else { return }
             writing = false
-            if error != nil {
+            if let error {
+                lastError = error.localizedDescription
+                print("[BeamDeck] write failed:", error.localizedDescription)
                 clearWrites()
                 onWriteError?()
             } else {
+                ackedCount += 1
                 pumpWrites()
             }
         }

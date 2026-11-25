@@ -16,6 +16,7 @@ final class Remote: ObservableObject {
     let demo = ProcessInfo.processInfo.arguments.contains("-demo")
 
     private var noticeTask: Task<Void, Never>?
+    private var selfTestRan = false
     private let savedKey = "lastLumina"
 
     init() {
@@ -50,6 +51,21 @@ final class Remote: ObservableObject {
     private func phaseChanged() {
         connected = lumina.connected
         if case .failed(let message) = lumina.phase { show(message) }
+        if connected, ProcessInfo.processInfo.arguments.contains("-selftest"), !selfTestRan {
+            selfTestRan = true
+            Task { await selfTest() }
+        }
+    }
+
+    /// `-selftest` launch argument: Home → Settings → Back, 3 s apart, to check the whole phone-to-projector path.
+    private func selfTest() async {
+        try? await Task.sleep(for: .seconds(1))
+        for key in ["home", "settings", "back"] {
+            print("[BeamDeck] selftest", key)
+            self.key(key)
+            try? await Task.sleep(for: .seconds(3))
+        }
+        print("[BeamDeck] selftest done: sent \(lumina.sentCount), acked \(lumina.ackedCount), error \(lumina.lastError ?? "none")")
     }
 
     // MARK: keys
