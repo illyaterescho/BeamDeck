@@ -22,25 +22,17 @@ struct BeamDeckApp: App {
 
 struct RootView: View {
     @EnvironmentObject private var remote: Remote
-    @EnvironmentObject private var link: BeamLink
-    @EnvironmentObject private var lumina: LuminaLink
-
-    private var showRemote: Bool {
-        switch link.phase {
-        case .ready: true
-        case .connecting, .securing: link.token != nil // brief reconnects keep the remote on screen
-        default: false
-        }
-    }
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
-            if remote.firmware { MainTabs(firmwareOnly: true) }
-            else if showRemote || remote.demo { MainTabs() }
+            if remote.showRemote { MainTabs() }
             else { ConnectView() }
         }
-        .animation(.smooth, value: showRemote)
-        .animation(.smooth, value: remote.firmware)
+        .animation(.smooth, value: remote.showRemote)
+        .task(id: scenePhase) {
+            if scenePhase == .active { await remote.monitorWiFi() }
+        }
         .overlay(alignment: .bottom) {
             if let notice = remote.notice {
                 Text(notice)
@@ -60,17 +52,20 @@ struct RootView: View {
 }
 
 struct MainTabs: View {
-    /// The firmware receiver gives no Wi-Fi, so app list and screen preview are hidden in that mode.
-    var firmwareOnly = false
+    @EnvironmentObject private var remote: Remote
 
     var body: some View {
         TabView {
             RemoteView().tabItem { Label("Пульт", systemImage: "av.remote") }
             TouchpadView().tabItem { Label("Тачпад", systemImage: "hand.point.up.left") }
-            if !firmwareOnly {
-                AppsView().tabItem { Label("Програми", systemImage: "square.grid.2x2") }
+            AppsView().tabItem { Label("Програми", systemImage: "square.grid.2x2") }
+            #if os(iOS)
+            ScreenView().tabItem { Label("Екран", systemImage: "tv") }
+            #else
+            if remote.hasReceiverSession || remote.demo {
                 ScreenView().tabItem { Label("Екран", systemImage: "tv") }
             }
+            #endif
             ProjectorView().tabItem { Label("Проєктор", systemImage: "videoprojector") }
         }
     }

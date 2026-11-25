@@ -21,7 +21,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: BeamDeck
         INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: "BeamDeck знаходить проєктор поруч і керує ним через Bluetooth."
-        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "BeamDeck показує екран проєктора через вашу Wi-Fi мережу."
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "BeamDeck керує проєктором і передає зображення через вашу локальну мережу."
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown"
@@ -33,5 +33,7 @@ targets:
     info:
       path: BeamDeck/Info.plist
       properties:
+        NSScreenCaptureUsageDescription: "BeamDeck показує вибраний екран iPhone на підключеному проєкторі."
+        UIBackgroundModes: [screen-capture]
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

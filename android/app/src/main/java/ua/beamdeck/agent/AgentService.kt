@@ -22,6 +22,7 @@ class AgentService : Service() {
     private lateinit var controls: ProjectorControls
     internal lateinit var geometryController: GeometryController
         private set
+    internal val mirror = MirrorController()
     private lateinit var projector: SystemProjectorController
     internal lateinit var shell: ShellBridge
         private set
@@ -57,7 +58,7 @@ class AgentService : Service() {
         shell = ShellBridge(this)
         router = CommandRouter(controls, projector, geometryController, InputEngine(this, shell)) {
             JSONObject().put("ble", ble?.state ?: "off").put("bleClients", ble?.connected ?: 0)
-                .put("lan", listeningOn?.url ?: JSONObject.NULL)
+                .put("lan", listeningOn?.url ?: JSONObject.NULL).put("pointerStream", true).put("screenMirror", true)
         }
     }
 
@@ -122,7 +123,7 @@ class AgentService : Service() {
             runCatching { server?.stop() }
             server = null
             val ready = lan != null && runCatching {
-                val candidate = LocalServer(lan, assets, sessions, controls, geometryController, projector, router, shell)
+                val candidate = LocalServer(lan, assets, sessions, controls, geometryController, projector, router, shell, mirror)
                 try {
                     candidate.start()
                     server = candidate
@@ -177,6 +178,7 @@ class AgentService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        mirror.clear()
         if (current === this) current = null
         if (initialized) {
             main.removeCallbacksAndMessages(null)

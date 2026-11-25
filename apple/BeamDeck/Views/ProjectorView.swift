@@ -3,9 +3,11 @@ import SwiftUI
 struct ProjectorView: View {
     @EnvironmentObject private var remote: Remote
     @EnvironmentObject private var link: BeamLink
+    @EnvironmentObject private var lumina: LuminaLink
     @State private var keymap: [String: Int] = [:]
     @State private var sleep = 0
     @State private var confirmForget = false
+    @State private var showBluetooth = false
 
     private let learnable: [(key: String, title: String)] = [
         ("focusUp", "Фокус: далі"), ("focusDown", "Фокус: ближче"), ("autoFocus", "Автофокус"),
@@ -16,35 +18,72 @@ struct ProjectorView: View {
         let status = remote.status
         NavigationStack {
             Form {
-                if remote.firmware {
-                    Section {
-                        LabeledContent("Приймач", value: remote.lumina.connectedName ?? "Вбудований у проєктор")
-                        Button("Від’єднатися", role: .destructive) { remote.lumina.disconnect() }
-                    } header: {
-                        Text("Підключення")
-                    } footer: {
-                        Text("Команди виконує вбудований приймач проєктора. Доступні навігація, фокус, гучність, живлення й медіа. Запуск програм і живе зображення екрана потребують приймача BeamDeck.")
-                    }
-                } else {
-                    Section("Підключення") {
-                        LabeledContent("Проєктор", value: link.connectedName ?? status.model)
+                Section("Підключення") {
+                    LabeledContent("Проєктор", value: link.connectedName ?? lumina.connectedName ?? status.model)
+                    LabeledContent("З’єднання", value: remote.connectionLabel)
+                    if !status.android.isEmpty {
                         LabeledContent("Android", value: status.android)
-                        LabeledContent("Wi-Fi", value: status.lan?.replacingOccurrences(of: "http://", with: "") ?? "Не під’єднано")
+                    }
+                    if remote.wifiReady, let address = remote.wifiAddress {
+                        LabeledContent("Адреса Wi-Fi", value: address.replacingOccurrences(of: "http://", with: ""))
+                    }
+                    Button("Підключення Bluetooth", systemImage: "dot.radiowaves.left.and.right") { showBluetooth = true }
+                    Button("Вибрати інший проєктор") { remote.disconnect() }
+                }
+
+                Section("Зображення") {
+                    NavigationLink { KeystoneView() } label: {
+                        Label("Трапеція наживо", systemImage: "trapezoid.and.line.vertical")
                     }
                 }
 
-                if !remote.firmware {
-                beamSections(status)
+                if remote.hasReceiverSession || remote.demo {
+                    if !remote.demo { firmwareSection }
+                }
+                if remote.firmware {
+                    Section("Вбудоване керування") {
+                        NavigationLink("Додаткові команди Bluetooth") { FirmwareControlsView() }
+                    }
+                }
+                if remote.hasReceiverSession || remote.demo {
+                    beamSections(status)
+                } else if remote.firmware {
+                    Section("Швидкі дії") {
+                        Button("Налаштування проєктора", systemImage: "gearshape") { remote.key("settings") }
+                        Button("Трапеція", systemImage: "trapezoid.and.line.vertical") { remote.key("keystone") }
+                        Button("Своя кнопка 1", systemImage: "1.circle") { remote.key("custom1") }
+                        Button("Своя кнопка 2", systemImage: "2.circle") { remote.key("custom2") }
+                    }
                 }
             }
             .formStyle(.grouped)
             .navigationTitle("Проєктор")
-            .task { if !remote.firmware { await loadKeymap() } }
+            .task(id: remote.receiverReady) { if remote.receiverReady { await loadKeymap() } }
             .onChange(of: status.learning?["state"] as? String) { _, _ in Task { await loadKeymap() } }
+            .sheet(isPresented: $showBluetooth) { BluetoothConnectionsView() }
             .confirmationDialog("Забути проєктор?", isPresented: $confirmForget, titleVisibility: .visible) {
-                Button("Забути", role: .destructive) { link.forgetCurrent() }
+                Button("Забути", role: .destructive) { remote.forgetProjector() }
             } message: {
                 Text("Для повторного підключення знадобиться код з екрана проєктора.")
+            }
+        }
+    }
+
+    private var firmwareSection: some View {
+        Section {
+            if remote.firmware || remote.attachedFirmware != nil {
+                LabeledContent("Вбудований Bluetooth", value: remote.firmware ? (lumina.connectedName ?? "Підключено") : "Недоступний")
+                Button("Від’єднати вбудований Bluetooth") { remote.detachFirmware() }
+            } else if !lumina.nearby.isEmpty {
+                Menu("Додати вбудований Bluetooth") {
+                    ForEach(lumina.nearby.sorted { $0.rssi > $1.rssi }) { device in
+                        Button(device.name) { remote.attachFirmware(device.id) }
+                    }
+                }
+            }
+        } footer: {
+            if !remote.firmware && remote.attachedFirmware == nil && !lumina.nearby.isEmpty {
+                Text("Якщо тут є Bluetooth вашого проєктора, виберіть його один раз. BeamDeck запам’ятає його для тачпада, клавіатури й сумісних команд.")
             }
         }
     }
@@ -98,6 +137,9 @@ struct ProjectorView: View {
                     Button { remote.send("open", ["destination": "grid", "value": ""]) } label: {
                         Label("Тестова сітка", systemImage: "squareshape.split.3x3")
                     }
+                    Button { remote.send("open", ["destination": "player", "value": ""]) } label: {
+                        Label("Програвач BeamDeck", systemImage: "play.rectangle")
+                    }
                     Button { remote.key("keystone") } label: { Label("Трапеція", systemImage: "trapezoid.and.line.vertical") }
                         .disabled(!status.available("keystone"))
                     Button { remote.key("custom1") } label: { Label("Своя кнопка 1", systemImage: "1.circle") }
@@ -122,6 +164,65 @@ struct ProjectorView: View {
     private func loadKeymap() async {
         guard let reply = try? await remote.call("keymap"), let keys = reply["keys"] as? [String: [String: Any]] else { return }
         keymap = keys.compactMapValues { entry in (entry["learned"] as? Bool == true) ? entry["code"] as? Int : nil }
+    }
+}
+
+private struct FirmwareControlsView: View {
+    @EnvironmentObject private var remote: Remote
+
+    var body: some View {
+        Form {
+            Section("Зображення") {
+                menu("Налаштування зображення", commands: Lumina.imageMenus)
+                menu("Режим проєкції", commands: values(7, [
+                    "Спереду зі столу", "Ззаду зі столу", "Спереду зі стелі", "Ззаду зі стелі",
+                ]))
+                menu("Формат екрана", commands: values(4, ["16:9", "4:3", "Авто"]))
+                menu("Колірна температура", commands: values(3, ["Стандартна", "Холодна", "Тепла"]))
+                menu("Режим яскравості", commands: values(6, ["Стандартний", "Еко", "Яскравий"]))
+            }
+            Section("Автоналаштування") {
+                menu("Автофокус", commands: Lumina.Command.toggles(5))
+                menu("Автоматична трапеція", commands: Lumina.Command.toggles(4))
+                menu("Автокорекція чотирьох кутів", commands: Lumina.Command.toggles(6))
+                menu("Розпізнавання екрана", commands: Lumina.Command.toggles(7))
+                menu("Обхід перешкод", commands: Lumina.Command.toggles(8))
+            }
+            Section("Медіа й трансляція") {
+                menu("Відтворення", commands: Lumina.mediaCommands)
+                menu("Трансляція й динаміки", commands: Lumina.castingMenus)
+                Button("Усі програми") { remote.firmwareCommand(.init("Усі програми", 11, 9)) }
+                Button("Джерело сигналу") { remote.firmwareCommand(.init("Джерело сигналу", 4, 5)) }
+            }
+            Section {
+                menu("Системні налаштування", commands: Lumina.settingsMenus)
+                menu("Вимкнути проєктор через", commands: values(5, ["Таймер вимкнений", "15 хв", "30 хв", "60 хв", "120 хв"]))
+                menu("Заставка", commands: [("5 хв", 300), ("10 хв", 600), ("20 хв", 1_200), ("60 хв", 3_600), ("Ніколи", 2_147_483_647)]
+                    .map { .value($0.0, 9, $0.1) })
+                menu("HDMI CEC", commands: Lumina.Command.toggles(10))
+                menu("Звук кнопок", commands: Lumina.Command.toggles(3))
+                menu("Автоматичний часовий пояс", commands: Lumina.Command.toggles(9))
+            } header: {
+                Text("Система")
+            } footer: {
+                Text("Доступність окремих команд залежить від прошивки проєктора.")
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("Команди Bluetooth")
+        .disabled(!remote.firmware)
+    }
+
+    private func menu(_ title: String, commands: [Lumina.Command]) -> some View {
+        Menu(title) {
+            ForEach(commands) { command in
+                Button(command.title) { remote.firmwareCommand(command) }
+            }
+        }
+    }
+
+    private func values(_ action: UInt8, _ titles: [String]) -> [Lumina.Command] {
+        titles.enumerated().map { .value($0.element, action, $0.offset) }
     }
 }
 

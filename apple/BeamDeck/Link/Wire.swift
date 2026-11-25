@@ -11,7 +11,7 @@ enum Wire {
 
     /// Splits a frame into GATT values: `[flags][chunk]`, 0x80 marks the last one.
     static func fragments(_ frame: Data, chunk: Int) -> [Data] {
-        let size = max(19, chunk - 1)
+        let size = max(1, chunk - 1)
         var parts: [Data] = []
         var offset = 0
         repeat {
@@ -92,6 +92,12 @@ enum Reason {
         case "field_required": "Відкрийте текстове поле на проєкторі."
         case "protected_field": "Це поле пароля, туди BeamDeck не вводить текст."
         case "invalid_url": "Посилання має починатися з https:// або http://."
+        case "invalid_lan": "Введіть локальну IPv4-адресу з екрана BeamDeck на проєкторі."
+        case "invalid_geometry": "Залиште кути в межах кадру й не перехрещуйте їх."
+        case "editor_busy": "Трапецію зараз редагують з іншого пристрою."
+        case "mirror_busy": "На проєкторі вже активна трансляція з іншого пристрою."
+        case "mirror_ended": "Трансляцію на проєкторі завершено."
+        case "invalid_frame": "Приймач не зміг відкрити кадр екрана."
         case "unsupported": "Цей проєктор не підтримує дію."
         case "rejected": "Проєктор відхилив команду."
         case "busy": "Проєктор зайнятий. Спробуйте ще раз."

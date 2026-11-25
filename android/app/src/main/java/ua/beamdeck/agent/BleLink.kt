@@ -180,10 +180,14 @@ internal class BleLink(
             device: BluetoothDevice, requestId: Int, descriptor: BluetoothGattDescriptor,
             preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray?,
         ) {
-            if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
             io.execute {
-                peers[device.address]?.subscribed = descriptor.uuid == CCCD &&
-                    value?.contentEquals(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) == true
+                val peer = peers[device.address]
+                val enabled = value?.contentEquals(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) == true
+                val disabled = value?.contentEquals(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE) == true
+                val valid = descriptor.uuid == CCCD && !preparedWrite && offset == 0 && (enabled || disabled)
+                if (valid) peer?.subscribed = enabled
+                if (responseNeeded) server?.sendResponse(device, requestId,
+                    if (valid) BluetoothGatt.GATT_SUCCESS else BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, 0, null)
             }
         }
 
@@ -313,8 +317,8 @@ internal class BleLink(
 
     private fun tick() {
         ensureRunning()
+        peers.values.filter { it.subscribed }.forEach(::pump)
         val listeners = peers.values.filter { it.subscribed && it.key != null && it.token != null }
-        listeners.forEach { if (it.sendingSince != 0L) pump(it) }
         if (listeners.isEmpty() || statusBusy) return
         statusBusy = true
         work.execute {
@@ -324,6 +328,7 @@ internal class BleLink(
                 if (status == null) return@execute
                 for (peer in peers.values) {
                     if (!peer.subscribed || peer.key == null || !sessions.valid(peer.token)) continue
+                    if (peer.sendingSince != 0L || peer.outbox.isNotEmpty()) continue
                     if (peer.lastStatus == status) continue
                     peer.lastStatus = status
                     reply(peer, JSONObject().put("op", "status").put("status", JSONObject(status)))

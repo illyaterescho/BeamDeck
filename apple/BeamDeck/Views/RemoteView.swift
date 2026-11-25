@@ -2,7 +2,6 @@ import SwiftUI
 
 struct RemoteView: View {
     @EnvironmentObject private var remote: Remote
-    @EnvironmentObject private var link: BeamLink
     @State private var keyboard = false
 
     var body: some View {
@@ -39,8 +38,9 @@ struct RemoteView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Circle().fill(link.phase == .ready || remote.demo ? Color.green : .orange).frame(width: 8, height: 8)
-            Text(remote.demo ? "Демо" : link.phase == .ready ? "Bluetooth" : "Повторне підключення…")
+            Circle().fill(remote.receiverReady || remote.firmware || remote.demo ? Color.green : .orange)
+                .frame(width: 8, height: 8)
+            Text(remote.connectionLabel)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -66,19 +66,29 @@ struct RemoteView: View {
 
     private var volume: some View {
         let status = remote.status
-        return HStack(spacing: 14) {
-            Button { remote.key("mute") } label: {
-                Image(systemName: status.muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .font(.title3)
-                    .frame(width: 44, height: 44)
-                    .contentShape(.rect)
+        return VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                RoundKey(symbol: "speaker.minus", label: "Тихіше", key: "volumeDown")
+                VolumeSlider()
+                RoundKey(symbol: "speaker.plus", label: "Голосніше", key: "volumeUp")
             }
-            .accessibilityLabel(status.muted ? "Увімкнути звук" : "Вимкнути звук")
-            VolumeSlider()
-            Text("\(status.volumeLevel)")
-                .font(.body.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 26, alignment: .trailing)
+            HStack {
+                Button { remote.key("mute") } label: {
+                    Label(status.muted ? "Увімкнути звук" : "Звук",
+                          systemImage: status.muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        .frame(minHeight: 35)
+                }
+                .disabled(!status.available("mute"))
+                .accessibilityLabel(status.muted ? "Увімкнути звук" : "Вимкнути звук")
+                Spacer()
+                if let percent = remote.volumePercent {
+                    Text(remote.volumeIsEstimated ? "≈\(percent)%" : "\(percent)%").monospacedDigit()
+                } else if remote.volumeIsEstimated {
+                    Text("Рівень не зчитується")
+                }
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 12)
@@ -243,30 +253,38 @@ struct PressStyle: ButtonStyle {
     }
 }
 
-/// Sends the first value immediately and then at most every 150 ms while dragging.
 struct VolumeSlider: View {
     @EnvironmentObject private var remote: Remote
-    @State private var value: Double = 0
+    @State private var draft: Int?
     @State private var editing = false
-    @State private var lastSent = Date.distantPast
+    @State private var lastPreview: Int?
+    @State private var nextPreview = ContinuousClock.now
 
     var body: some View {
-        let status = remote.status
-        Slider(value: $value, in: Double(status.volumeMin)...Double(status.volumeMax)) { editing in
+        Slider(value: Binding(
+            get: { Double(draft ?? remote.volumePercent ?? 0) },
+            set: { value in update(Int(value.rounded())) }
+        ), in: 0...100, step: 1) { editing in
             self.editing = editing
-            if !editing { push(force: true) }
+            if editing {
+                lastPreview = nil
+                nextPreview = .now
+            } else {
+                if let draft, draft != lastPreview { remote.setVolume(percent: draft) }
+                draft = nil
+            }
         }
-        .disabled(!status.available("volume"))
-        .onAppear { value = Double(status.volumeLevel) }
-        .onChange(of: status.volumeLevel) { _, level in if !editing { value = Double(level) } }
-        .onChange(of: value) { old, new in if editing, old.rounded() != new.rounded() { push(force: false) } }
+        .disabled(!remote.canSetVolume)
         .accessibilityLabel("Гучність")
     }
 
-    private func push(force: Bool) {
-        guard force || Date().timeIntervalSince(lastSent) > 0.15 else { return }
-        lastSent = Date()
-        remote.send("volume", ["level": Int(value.rounded())])
+    private func update(_ percent: Int) {
+        if !editing { remote.setVolume(percent: percent); return }
+        draft = percent
+        guard .now >= nextPreview, percent != lastPreview else { return }
+        remote.setVolume(percent: percent)
+        lastPreview = percent
+        nextPreview = .now.advanced(by: .milliseconds(250))
     }
 }
 
@@ -379,6 +397,11 @@ struct KeyboardSheet: View {
                 Section {
                     Button { remote.send("text", ["action": "delete", "text": ""]) } label: { Label("Стерти символ", systemImage: "delete.left") }
                     Button { remote.send("text", ["action": "enter", "text": ""]) } label: { Label("Enter", systemImage: "return") }
+                    if remote.firmware {
+                        ForEach(Lumina.keyboardCommands) { command in
+                            Button(command.title) { remote.firmwareCommand(command) }
+                        }
+                    }
                 }
             }
             .navigationTitle("Клавіатура")

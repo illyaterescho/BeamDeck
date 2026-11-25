@@ -54,10 +54,14 @@ internal class LocalServer(
     private val projector: SystemProjectorController,
     private val router: CommandRouter,
     private val shell: ShellBridge,
+    private val mirror: MirrorController,
 ) {
     private val liveSlots = Semaphore(4)
     private val editorSlots = Semaphore(3)
+    private val pointerSlots = Semaphore(3)
     private val requests = RequestBudget()
+    private val mirrorFrames = RequestBudget(globalLimit = 180, peerLimit = 180)
+    private val mirrorDecode = Semaphore(1)
     private val screenSlot = Semaphore(1)
 
     private val engine = embeddedServer(CIO, host = lan.ipv4, port = Lan.PORT, configure = {
@@ -84,10 +88,11 @@ internal class LocalServer(
             val origin = headers[HttpHeaders.Origin]
             val peer = call.request.local.remoteAddress
             val validOrigin = origin == null || origin == lan.url
-            val socketRoute = call.request.path() in setOf("/api/v1/live", "/api/v1/geometry/live")
+            val socketRoute = call.request.path() in setOf("/api/v1/live", "/api/v1/geometry/live", "/api/v1/pointer/live")
             val failure = when {
                 headers.getAll(HttpHeaders.Host) != listOf(lan.host) || !lan.contains(peer) || !validOrigin -> ApiProblem(403, "forbidden")
-                call.request.path().startsWith("/api/") && !requests.allow(peer) -> ApiProblem(429, "rate_limited")
+                call.request.path().startsWith("/api/") && call.request.path() != "/api/v1/mirror/frame" &&
+                    !requests.allow(peer) -> ApiProblem(429, "rate_limited")
                 socketRoute && origin != lan.url -> ApiProblem(403, "forbidden")
                 socketRoute && !sessions.valid(call.sessionToken()) -> ApiProblem(401, "unauthorized")
                 call.request.httpMethod == HttpMethod.Post && headers["X-BeamDeck-Request"] != "1" -> ApiProblem(403, "forbidden")
@@ -246,6 +251,51 @@ internal class LocalServer(
                         device { geometry.apply(value, true); ActionResult().json() }
                     }
                 }
+                post("/mirror/start") {
+                    call.safe {
+                        val owner = authenticated()
+                        body()
+                        device { JSONObject().put("id", mirror.start(owner)) }
+                    }
+                }
+                post("/mirror/frame") {
+                    call.safe {
+                        val owner = authenticated()
+                        val id = request.headers["X-BeamDeck-Mirror"]?.takeIf(MIRROR_ID::matches)
+                            ?: throw ApiProblem(400, "bad_request")
+                        device { mirror.verify(owner, id) }
+                        if (!mirrorFrames.allow(request.local.remoteAddress) || !mirrorDecode.tryAcquire()) {
+                            throw ApiProblem(429, "busy")
+                        }
+                        try {
+                            val length = request.contentLength()?.takeIf { it in 4L..MirrorController.MAX_BYTES.toLong() }
+                                ?: throw ApiProblem(400, "invalid_frame")
+                            if (request.contentType().withoutParameters() != ContentType.Image.JPEG) {
+                                throw ApiProblem(400, "invalid_frame")
+                            }
+                            val bytes = ByteArray(length.toInt())
+                            withTimeout(2_000) { receiveChannel().readFully(bytes, 0, bytes.size) }
+                            val bitmap = withContext(Dispatchers.Default) { MirrorController.decode(bytes) }
+                            device { mirror.publish(owner, id, bitmap); JSONObject().put("accepted", true) }
+                        } finally {
+                            mirrorDecode.release()
+                        }
+                    }
+                }
+                post("/mirror/stop") {
+                    call.safe {
+                        val owner = authenticated()
+                        val id = body("id").string("id", MIRROR_ID)
+                        device { mirror.stop(owner, id); JSONObject().put("stopped", true) }
+                    }
+                }
+                post("/mirror/keepalive") {
+                    call.safe {
+                        val owner = authenticated()
+                        val id = body("id").string("id", MIRROR_ID)
+                        device { mirror.keepAlive(owner, id); JSONObject().put("accepted", true) }
+                    }
+                }
                 webSocket("/geometry/live") {
                     if (!editorSlots.tryAcquire()) {
                         close(CloseReason(CloseReason.Codes.TRY_AGAIN_LATER, "Editor busy"))
@@ -294,6 +344,44 @@ internal class LocalServer(
                     } finally {
                         withContext(NonCancellable + Dispatchers.Main.immediate) { geometry.discardPreview(editor) }
                         editorSlots.release()
+                    }
+                }
+                webSocket("/pointer/live") {
+                    if (!pointerSlots.tryAcquire()) {
+                        close(CloseReason(CloseReason.Codes.TRY_AGAIN_LATER, "Touchpad busy"))
+                        return@webSocket
+                    }
+                    try {
+                        var window = SystemClock.elapsedRealtime()
+                        var frames = 0
+                        for (frame in incoming) {
+                            if (!sessions.valid(call.sessionToken())) {
+                                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Session expired"))
+                                break
+                            }
+                            val now = SystemClock.elapsedRealtime()
+                            if (now - window >= 1_000) {
+                                window = now
+                                frames = 0
+                            }
+                            if (frame !is Frame.Text || ++frames > 90) {
+                                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Touchpad frame limit"))
+                                break
+                            }
+                            val reply = try {
+                                val input = JSONObject(frame.readText())
+                                val op = input.optString("op")
+                                if (op !in POINTER_OPS) throw ApiProblem(400, "bad_request")
+                                withContext(Dispatchers.IO) { router.handle(op, input) }
+                            } catch (_: JSONException) {
+                                JSONObject().put("error", "bad_request")
+                            } catch (problem: ApiProblem) {
+                                JSONObject().put("error", problem.code)
+                            }
+                            withTimeout(1_000) { send(Frame.Text(reply.toString())) }
+                        }
+                    } finally {
+                        pointerSlots.release()
                     }
                 }
                 webSocket("/live") {
@@ -396,7 +484,7 @@ internal class LocalServer(
     private fun cookie(token: String, seconds: Int) =
         "$COOKIE=$token; Path=/api; Max-Age=$seconds; HttpOnly; SameSite=Strict"
 
-    private class RequestBudget {
+    private class RequestBudget(private val globalLimit: Int = 340, private val peerLimit: Int = 70) {
         private var window = SystemClock.elapsedRealtime()
         private var count = 0
         private val byPeer = HashMap<String, Int>()
@@ -410,7 +498,7 @@ internal class LocalServer(
                 byPeer.clear()
             }
             val used = byPeer[peer] ?: 0
-            if (count >= 340 || used >= 70) return false
+            if (count >= globalLimit || used >= peerLimit) return false
             count++
             byPeer[peer] = used + 1
             return true
@@ -423,6 +511,8 @@ internal class LocalServer(
         private val PIN = Regex("[0-9]{6}")
         private val APP_ID = Regex("[A-Za-z0-9_.$/]{3,300}")
         private val COMMAND = Regex("[a-zA-Z]{2,20}")
+        private val POINTER_OPS = setOf("pointer", "click", "scroll")
+        private val MIRROR_ID = Regex("[0-9a-f-]{36}")
         private val ASSET_NAME = Regex("[A-Za-z0-9_.-]{1,100}\\.(?:css|js)")
     }
 }

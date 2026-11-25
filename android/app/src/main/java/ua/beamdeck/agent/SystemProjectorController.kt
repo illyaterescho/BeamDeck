@@ -17,9 +17,9 @@ internal class SystemProjectorController(private val context: Context) {
             .put("keystone", "player_only")
             .put("hardwareAutoKeystone", "unsupported")
             .put("vendorLauncher", vendor?.component?.flattenToShortString() ?: JSONObject.NULL)
-            .put("canOpen", NavigationService.current != null || MainActivity.foreground != null || CinemaActivity.current != null)
+            .put("canOpen", NavigationService.current != null || MainActivity.foreground != null || CinemaActivity.current != null || MirrorActivity.current != null)
             .put("keyboard", keyboardReason() ?: "ready")
-            .put("display", CinemaActivity.current?.mode ?: "closed")
+            .put("display", if (MirrorActivity.current != null) "mirror" else CinemaActivity.current?.mode ?: "closed")
             .put("playing", CinemaActivity.current?.playing() ?: false)
     }
 
@@ -49,7 +49,7 @@ internal class SystemProjectorController(private val context: Context) {
             }
             else -> throw ApiProblem(400, "bad_request")
         }
-        val owner = (NavigationService.current as? Context) ?: MainActivity.foreground ?: CinemaActivity.current
+        val owner = (NavigationService.current as? Context) ?: MainActivity.foreground ?: CinemaActivity.current ?: MirrorActivity.current
             ?: throw ApiProblem(409, "launch_blocked")
         try {
             owner.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

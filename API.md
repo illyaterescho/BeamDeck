@@ -93,3 +93,16 @@ HTTP JSON обмежено 8192 байтами. Введення в поле о�
 `POST /command` тепер приймає також `menu`, `settings`, `recents`, `power`, `standby`, `wakeup`, `input`, `keystone`, `custom1`, `custom2`. Фокус і трапеція працюють після навчання кнопок.
 `status.receiver` містить `ble`, `bleClients`, `lan`, `adb` (`ready`, `authorizing` або `off`), `accessibility` і `foreground`. `status.learning` показує поточне навчання кнопки.
 Нові коди: `adb_required`, `adb_authorizing`, `adb_lost`, `adb_timeout`, `learn_required`, `no_focus`. `key_submitted` означає, що Android прийняв натискання через ADB.
+
+## Трансляція екрана iPhone
+
+`receiver.screenMirror` позначає підтримку в Agent 0.3.4. Телефон запускає передачу лише після системного вибору екрана. Усі запити йдуть до вже спареного приймача з cookie сеансу й заголовком `X-BeamDeck-Request: 1`.
+
+| Шлях POST від `/api/v1` | Запит і відповідь |
+| --- | --- |
+| `/mirror/start` | JSON `{}`. Відкриває повноекранний приймач і повертає `{"id":"…"}`. |
+| `/mirror/frame` | Один JPEG-кадр до 384 КіБ і 1024 px по кожній осі, `Content-Type: image/jpeg`, `X-BeamDeck-Mirror` з ID. |
+| `/mirror/keepalive` | JSON з `id`. Продовжує сеанс, коли зображення статичне. |
+| `/mirror/stop` | JSON з `id`. Прибирає зображення й закриває приймач трансляції. |
+
+Проєктор застосовує геометрію BeamDeck до трансляції наживо. Кадри залишаються в пам’яті. Активний сеанс закривається після 10 секунд без кадрів чи сигналу від телефона.

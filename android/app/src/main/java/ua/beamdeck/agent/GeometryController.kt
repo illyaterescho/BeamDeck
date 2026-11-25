@@ -67,6 +67,7 @@ internal class GeometryController(context: Context) {
     private fun update(value: Geometry) {
         geometry = value
         CinemaActivity.current?.updateGeometry(value)
+        MirrorActivity.current?.redraw()
     }
 
     fun loadSettings(): CinemaSettings = runCatching { CinemaSettings.parse(JSONObject(store.getString("settings", "")!!)) }

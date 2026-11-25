@@ -14,3 +14,4 @@ apple/build/
 apple/BeamDeck.xcodeproj/xcuserdata/
 apple/BeamDeck.xcodeproj/project.xcworkspace/xcuserdata/
 *.apk
+*.ipa

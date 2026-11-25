@@ -18,6 +18,12 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>BeamDeck показує вибраний екран iPhone на підключеному проєкторі.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>screen-capture</string>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

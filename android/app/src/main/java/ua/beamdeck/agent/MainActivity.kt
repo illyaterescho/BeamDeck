@@ -111,6 +111,7 @@ class MainActivity : Activity() {
         }
         row(actions, getString(R.string.open_grid), false) { cinema("grid") }
         row(actions, getString(R.string.open_player), false) { cinema("player") }
+        row(actions, "Екран iPhone", false) { MirrorActivity.open(this) }
         row(actions, autostartTitle(), false) {
             val enabled = !BootReceiver.enabled(this)
             BootReceiver.setEnabled(this, enabled)

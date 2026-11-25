@@ -1,11 +1,16 @@
 import SwiftUI
 
 struct ConnectView: View {
+    @EnvironmentObject private var remote: Remote
     @EnvironmentObject private var link: BeamLink
     @EnvironmentObject private var lumina: LuminaLink
     @State private var pin = ""
     @State private var pairing = false
     @State private var pinError: String?
+    @State private var wifiAddress = ""
+    @State private var wifiPin = ""
+    @State private var wifiPairing = false
+    @State private var wifiError: String?
     @FocusState private var pinFocused: Bool
 
     var body: some View {
@@ -19,7 +24,7 @@ struct ConnectView: View {
                             .frame(height: 64)
                         Text("Під’єднайте проєктор")
                             .font(.title2.bold())
-                        Text("Відкрийте BeamDeck на проєкторі й тримайте телефон поруч. Wi-Fi не потрібен.")
+                        Text("Виберіть проєктор поруч або введіть адресу з екрана BeamDeck на проєкторі.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -35,14 +40,16 @@ struct ConnectView: View {
                     nearbySection
                     firmwareSection
                 }
+                wifiSection
             }
             .navigationTitle("BeamDeck")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .onAppear {
-                if link.phase == .idle { link.scan() }
+                link.scan()
                 lumina.scan()
+                if wifiAddress.isEmpty { wifiAddress = remote.wifiAddress ?? "" }
             }
             .onChange(of: link.phase) { _, phase in
                 if phase == .needsPin { pin = ""; pinFocused = true }
@@ -56,10 +63,10 @@ struct ConnectView: View {
             Section {
                 ForEach(lumina.nearby.sorted { $0.rssi > $1.rssi }) { projector in
                     Button {
-                        lumina.connect(projector.id)
+                        remote.connectFirmware(projector.id)
                     } label: {
                         HStack {
-                            Label(projector.name, systemImage: "wifi.router")
+                            Label(projector.name, systemImage: "dot.radiowaves.left.and.right")
                             Spacer()
                             if lumina.phase == .connecting && lumina.connectedName == projector.name {
                                 ProgressView()
@@ -73,7 +80,8 @@ struct ConnectView: View {
             } header: {
                 Text("Вбудований приймач проєктора")
             } footer: {
-                Text("Якщо навігацію BeamDeck блокує прошивка, підключіться сюди — стрілки, OK і фокус працюватимуть одразу, без коду.")
+                if case .failed(let message) = lumina.phase { Text(message).foregroundStyle(.red) }
+                else { Text("Пряме керування через Bluetooth без PIN-коду.") }
             }
         }
     }
@@ -89,7 +97,7 @@ struct ConnectView: View {
             }
             ForEach(link.nearby.sorted { $0.rssi > $1.rssi }) { projector in
                 Button {
-                    link.connect(projector.id)
+                    remote.connectBeam(projector.id)
                 } label: {
                     HStack {
                         Label(projector.name, systemImage: "videoprojector")
@@ -105,7 +113,7 @@ struct ConnectView: View {
             if case .failed(let message) = link.phase {
                 Text(message).foregroundStyle(.red)
             } else {
-                Text("Якщо проєктора немає в списку, перевірте рядок «Bluetooth» на його екрані.")
+                Text("Після введення коду пульт сам підхопить Wi-Fi, якщо ви в одній мережі.")
             }
         }
     }
@@ -136,7 +144,38 @@ struct ConnectView: View {
             else { Text("Код потрібен лише під час першого підключення цього телефона.") }
         }
         Section {
-            Button("Вибрати інший проєктор", role: .cancel) { link.disconnect(); link.scan() }
+            Button("Вибрати інший проєктор", role: .cancel) { remote.disconnect() }
+        }
+    }
+
+    private var wifiSection: some View {
+        Section("Підключення через Wi-Fi") {
+            TextField("IP-адреса з екрана BeamDeck", text: $wifiAddress)
+                .autocorrectionDisabled()
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.numbersAndPunctuation)
+                #endif
+            TextField("Код із 6 цифр", text: $wifiPin)
+                #if os(iOS)
+                .keyboardType(.numberPad)
+                .textContentType(.oneTimeCode)
+                #endif
+                .onChange(of: wifiPin) { _, value in
+                    wifiPin = String(value.filter { $0.isASCII && $0.isNumber }.prefix(6))
+                }
+            Button(wifiPairing ? "Підключення…" : "Підключити") {
+                wifiPairing = true
+                wifiError = nil
+                Task {
+                    defer { wifiPairing = false }
+                    do { try await remote.pairWiFi(address: wifiAddress, pin: wifiPin) }
+                    catch is CancellationError { }
+                    catch { wifiError = error.localizedDescription }
+                }
+            }
+            .disabled(wifiPairing || wifiPin.count != 6 || wifiAddress.isEmpty)
+            if let wifiError { Text(wifiError).font(.footnote).foregroundStyle(.red) }
         }
     }
 

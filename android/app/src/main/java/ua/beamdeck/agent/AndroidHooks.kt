@@ -138,7 +138,7 @@ class NavigationService : AccessibilityService() {
         }
         view.px = (view.px + dx).coerceIn(0f, metrics.widthPixels - 1f)
         view.py = (view.py + dy).coerceIn(0f, metrics.heightPixels - 1f)
-        view.invalidate()
+        view.postInvalidateOnAnimation()
         main.removeCallbacks(hideCursor)
         main.postDelayed(hideCursor, 6_000)
         view.px.toInt() to view.py.toInt()

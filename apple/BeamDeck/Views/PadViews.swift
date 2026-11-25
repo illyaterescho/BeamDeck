@@ -5,6 +5,7 @@ struct TouchpadView: View {
     @EnvironmentObject private var remote: Remote
     @State private var last: CGSize = .zero
     @State private var lastScroll: CGFloat = 0
+    @State private var lastHorizontalScroll: CGFloat = 0
     @AppStorage("pointerSpeed") private var speed = 2.4
 
     var body: some View {
@@ -20,10 +21,16 @@ struct TouchpadView: View {
                     pad
                     scrollStrip
                 }
+                if remote.firmware { horizontalScrollStrip }
                 HStack(spacing: 18) {
                     RoundKey(symbol: "chevron.backward", label: "Назад", key: "back")
                     RoundKey(symbol: "house", label: "Додому", key: "home")
                     RoundKey(symbol: "circle.circle", label: "OK", key: "ok")
+                    if remote.firmware {
+                        Button("Правий клік", systemImage: "cursorarrow.click.2", action: remote.firmwareRightClick)
+                            .labelStyle(.iconOnly)
+                            .frame(width: 44, height: 44)
+                    }
                 }
                 HStack {
                     Image(systemName: "tortoise").foregroundStyle(.secondary)
@@ -38,6 +45,22 @@ struct TouchpadView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
         }
+    }
+
+    private var horizontalScrollStrip: some View {
+        Capsule()
+            .fill(Color.surface)
+            .frame(height: 34)
+            .overlay { Image(systemName: "arrow.left.and.right").foregroundStyle(.secondary) }
+            .gesture(DragGesture(minimumDistance: 4)
+                .onChanged { value in
+                    let delta = value.translation.width - lastHorizontalScroll
+                    guard abs(delta) >= 14 else { return }
+                    lastHorizontalScroll = value.translation.width
+                    remote.firmwareHorizontalScroll(Double(delta * 3))
+                }
+                .onEnded { _ in lastHorizontalScroll = 0 })
+            .accessibilityLabel("Горизонтальна прокрутка")
     }
 
     private var pad: some View {
@@ -90,7 +113,7 @@ struct TouchpadView: View {
                     let delta = value.translation.height - lastScroll
                     guard abs(delta) > 18 else { return }
                     lastScroll = value.translation.height
-                    remote.send("scroll", ["dx": 0, "dy": Double(delta * 6)])
+                    remote.scroll(by: Double(delta * 6))
                 }
                 .onEnded { _ in lastScroll = 0 })
             .accessibilityLabel("Прокрутка")
@@ -113,8 +136,7 @@ struct AppsView: View {
         NavigationStack {
             ScrollView {
                 if remote.apps.isEmpty {
-                    ContentUnavailableView("Програми завантажуються", systemImage: "square.grid.2x2",
-                                           description: Text("Список береться з проєктора."))
+                    ContentUnavailableView("Список програм недоступний", systemImage: "square.grid.2x2")
                         .padding(.top, 60)
                 }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 14)], spacing: 18) {
@@ -124,6 +146,15 @@ struct AppsView: View {
                             .contextMenu {
                                 Button(favorites.contains(app.id) ? "Прибрати з обраних" : "До обраних",
                                        systemImage: favorites.contains(app.id) ? "star.slash" : "star") { toggle(app) }
+                                if remote.receiverReady, !app.id.hasPrefix("lumina."), remote.canSetVolume {
+                                    Menu("Відкрити з гучністю") {
+                                        ForEach([25, 50, 75], id: \.self) { percent in
+                                            Button("\(percent)%") {
+                                                remote.send("scene", ["appId": app.id, "percent": percent])
+                                            }
+                                        }
+                                    }
+                                }
                             }
                     }
                 }
@@ -132,7 +163,7 @@ struct AppsView: View {
             .navigationTitle("Програми")
             .searchable(text: $query, prompt: "Пошук")
             .refreshable { await remote.loadApps() }
-            .task { if remote.apps.isEmpty { await remote.loadApps() } }
+            .task(id: [remote.receiverReady, remote.firmware]) { await remote.loadApps() }
         }
     }
 
@@ -174,9 +205,11 @@ struct AppTile: View {
 /// Live picture of the projector over Wi-Fi; tapping the picture taps the projector.
 struct ScreenView: View {
     @EnvironmentObject private var remote: Remote
-    @EnvironmentObject private var link: BeamLink
     @State private var frame: Image?
     @State private var problem: String?
+    #if os(iOS)
+    @State private var showPhoneProjection = false
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -211,21 +244,41 @@ struct ScreenView: View {
                         Text(problem ?? "Підключаємося через Wi-Fi…")
                     }
                 }
+                #if os(iOS)
+                Button("Показати екран iPhone", systemImage: "iphone.radiowaves.left.and.right") {
+                    showPhoneProjection = true
+                }
+                .buttonStyle(.borderedProminent)
+                #endif
                 Spacer(minLength: 0)
             }
             .padding(20)
             .navigationTitle("Екран")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showPhoneProjection) { PhoneProjectionView() }
             #endif
-            .task(id: remote.status.lan) { await stream() }
+            .task(id: previewAddress) { await stream() }
         }
     }
 
+    private var previewAddress: String? {
+        #if os(iOS)
+        if showPhoneProjection { return nil }
+        #endif
+        return remote.wifiReady ? remote.wifiAddress : nil
+    }
+
     private func stream() async {
+        guard let address = previewAddress, let token = remote.sessionToken else {
+            frame = nil
+            problem = "Під’єднайте проєктор і телефон до однієї Wi-Fi мережі."
+            return
+        }
         while !Task.isCancelled {
             do {
-                let data = try await WiFi.screen(remote.status.lan, token: link.token)
+                let data = try await WiFi.screen(address, token: token)
+                guard !Task.isCancelled else { return }
                 if let image = PlatformImage(data: data) {
                     #if os(iOS)
                     frame = Image(uiImage: image)
@@ -236,10 +289,9 @@ struct ScreenView: View {
                 }
                 try? await Task.sleep(for: .milliseconds(350))
             } catch {
+                guard !Task.isCancelled else { return }
                 frame = nil
-                problem = remote.status.lan == nil
-                    ? "Під’єднайте проєктор і телефон до однієї Wi-Fi мережі."
-                    : error.localizedDescription
+                problem = error.localizedDescription
                 try? await Task.sleep(for: .seconds(3))
             }
         }
