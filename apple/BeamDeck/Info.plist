@@ -29,20 +29,9 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>BeamDeck слухає голосові команди, лише поки ви утримуєте кнопку мікрофона.</string>
-	<key>NSScreenCaptureUsageDescription</key>
-	<string>BeamDeck показує вибраний екран iPhone на підключеному проєкторі.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>BeamDeck розпізнає українські голосові команди для керування проєктором.</string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>screen-capture</string>
-	</array>
 </dict>
 </plist>

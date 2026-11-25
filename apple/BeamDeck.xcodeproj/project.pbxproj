@@ -8,43 +8,35 @@
 
 /* Begin PBXBuildFile section */
 		00034BF67D5D705166E329CF /* BeamDeckApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7F484289E12456C49E39ED /* BeamDeckApp.swift */; };
-		151E5B1167F2628A2D1DEE72 /* Wire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37F97E0ADBD9D6D7DE4DAFD7 /* Wire.swift */; };
 		1F5A98A0A6A83011435DE9AC /* RemoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFF9B65F92600CD9CB9FFC19 /* RemoteView.swift */; };
 		24FDF2AA863A33203CAD7F05 /* Remote+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20560B31966367D0DDFEF3B /* Remote+Actions.swift */; };
 		3CE9B416F32F0E64999C31A9 /* VoiceCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 361603479202DA4CE54F9983 /* VoiceCommands.swift */; };
 		495AC6DC9D7D44C0BEC6CBE0 /* AirMouse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B21E84733A29579E09B23FC /* AirMouse.swift */; };
+		591DF52378B42B5AB7331109 /* LinkTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 061834F7258DA1F8FC7C1EC2 /* LinkTypes.swift */; };
 		5B4DA8AFD0E9505B599411AD /* LuminaLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0066DA61495DE2F49A90C82E /* LuminaLink.swift */; };
-		6BCF4B69999DD91550B7E591 /* BeamLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAAA7368F92F7FB1496DF957 /* BeamLink.swift */; };
-		81B600B3596650C898C51962 /* KeystoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C60E5FFE448A6601224E98F /* KeystoneView.swift */; };
-		88A0FDDFC672010910BDF50E /* ProjectionConnections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D0CD814BFF8646D58563D1 /* ProjectionConnections.swift */; };
 		8CD94F5F1F086A19D0A57E52 /* ConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2CD05FEA66AA844A6E4C06D /* ConnectView.swift */; };
 		A2DA55CB43D9A1F04B17FB73 /* VoiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECC9838AD227D698DA94A742 /* VoiceView.swift */; };
 		AF6D790CE0EB016D7560D190 /* VoiceControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 155B64FD3C1D1EDE9E834092 /* VoiceControl.swift */; };
 		AFE56329FB9386024463C83B /* ProjectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C2BDC4F27466560C738B4B /* ProjectorView.swift */; };
-		BB8A5F799FEB0181039383FF /* PhoneMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85A51B6E9889D103C109A7A /* PhoneMirror.swift */; };
 		BDBC5F14D920476F188CB069 /* Remote.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C412F4AFE98532C58B91DCC /* Remote.swift */; };
 		C0AF043B15C97B06E719D9B6 /* PadViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89ED8DB086949FB3C77A722B /* PadViews.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0066DA61495DE2F49A90C82E /* LuminaLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LuminaLink.swift; sourceTree = "<group>"; };
+		061834F7258DA1F8FC7C1EC2 /* LinkTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkTypes.swift; sourceTree = "<group>"; };
 		155B64FD3C1D1EDE9E834092 /* VoiceControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceControl.swift; sourceTree = "<group>"; };
 		1C7F484289E12456C49E39ED /* BeamDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeamDeckApp.swift; sourceTree = "<group>"; };
-		33D0CD814BFF8646D58563D1 /* ProjectionConnections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectionConnections.swift; sourceTree = "<group>"; };
 		361603479202DA4CE54F9983 /* VoiceCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCommands.swift; sourceTree = "<group>"; };
-		37F97E0ADBD9D6D7DE4DAFD7 /* Wire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Wire.swift; sourceTree = "<group>"; };
-		5C60E5FFE448A6601224E98F /* KeystoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeystoneView.swift; sourceTree = "<group>"; };
 		7C412F4AFE98532C58B91DCC /* Remote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Remote.swift; sourceTree = "<group>"; };
 		89ED8DB086949FB3C77A722B /* PadViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadViews.swift; sourceTree = "<group>"; };
 		9B21E84733A29579E09B23FC /* AirMouse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirMouse.swift; sourceTree = "<group>"; };
 		A04972BD3AD389956ADF534A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B20560B31966367D0DDFEF3B /* Remote+Actions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Remote+Actions.swift"; sourceTree = "<group>"; };
-		BAAA7368F92F7FB1496DF957 /* BeamLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeamLink.swift; sourceTree = "<group>"; };
 		C5C2BDC4F27466560C738B4B /* ProjectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectorView.swift; sourceTree = "<group>"; };
 		D2CD05FEA66AA844A6E4C06D /* ConnectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectView.swift; sourceTree = "<group>"; };
 		ECC9838AD227D698DA94A742 /* VoiceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceView.swift; sourceTree = "<group>"; };
 		EFF9B65F92600CD9CB9FFC19 /* RemoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteView.swift; sourceTree = "<group>"; };
-		F85A51B6E9889D103C109A7A /* PhoneMirror.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneMirror.swift; sourceTree = "<group>"; };
 		FAEF6433DC812A17153955F0 /* BeamDeck.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BeamDeck.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -80,9 +72,8 @@
 		48BBBDCB96991E5BAAFAD0F8 /* Link */ = {
 			isa = PBXGroup;
 			children = (
-				BAAA7368F92F7FB1496DF957 /* BeamLink.swift */,
+				061834F7258DA1F8FC7C1EC2 /* LinkTypes.swift */,
 				0066DA61495DE2F49A90C82E /* LuminaLink.swift */,
-				37F97E0ADBD9D6D7DE4DAFD7 /* Wire.swift */,
 			);
 			path = Link;
 			sourceTree = "<group>";
@@ -91,9 +82,7 @@
 			isa = PBXGroup;
 			children = (
 				D2CD05FEA66AA844A6E4C06D /* ConnectView.swift */,
-				5C60E5FFE448A6601224E98F /* KeystoneView.swift */,
 				89ED8DB086949FB3C77A722B /* PadViews.swift */,
-				33D0CD814BFF8646D58563D1 /* ProjectionConnections.swift */,
 				C5C2BDC4F27466560C738B4B /* ProjectorView.swift */,
 				EFF9B65F92600CD9CB9FFC19 /* RemoteView.swift */,
 				ECC9838AD227D698DA94A742 /* VoiceView.swift */,
@@ -105,7 +94,6 @@
 			isa = PBXGroup;
 			children = (
 				9B21E84733A29579E09B23FC /* AirMouse.swift */,
-				F85A51B6E9889D103C109A7A /* PhoneMirror.swift */,
 				7C412F4AFE98532C58B91DCC /* Remote.swift */,
 				B20560B31966367D0DDFEF3B /* Remote+Actions.swift */,
 				361603479202DA4CE54F9983 /* VoiceCommands.swift */,
@@ -175,13 +163,10 @@
 			files = (
 				495AC6DC9D7D44C0BEC6CBE0 /* AirMouse.swift in Sources */,
 				00034BF67D5D705166E329CF /* BeamDeckApp.swift in Sources */,
-				6BCF4B69999DD91550B7E591 /* BeamLink.swift in Sources */,
 				8CD94F5F1F086A19D0A57E52 /* ConnectView.swift in Sources */,
-				81B600B3596650C898C51962 /* KeystoneView.swift in Sources */,
+				591DF52378B42B5AB7331109 /* LinkTypes.swift in Sources */,
 				5B4DA8AFD0E9505B599411AD /* LuminaLink.swift in Sources */,
 				C0AF043B15C97B06E719D9B6 /* PadViews.swift in Sources */,
-				BB8A5F799FEB0181039383FF /* PhoneMirror.swift in Sources */,
-				88A0FDDFC672010910BDF50E /* ProjectionConnections.swift in Sources */,
 				AFE56329FB9386024463C83B /* ProjectorView.swift in Sources */,
 				24FDF2AA863A33203CAD7F05 /* Remote+Actions.swift in Sources */,
 				BDBC5F14D920476F188CB069 /* Remote.swift in Sources */,
@@ -189,7 +174,6 @@
 				3CE9B416F32F0E64999C31A9 /* VoiceCommands.swift in Sources */,
 				AF6D790CE0EB016D7560D190 /* VoiceControl.swift in Sources */,
 				A2DA55CB43D9A1F04B17FB73 /* VoiceView.swift in Sources */,
-				151E5B1167F2628A2D1DEE72 /* Wire.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -203,14 +187,12 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				ENABLE_APP_SANDBOX = YES;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_RESOURCE_ACCESS_BLUETOOTH = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BeamDeck/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BeamDeck;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "BeamDeck знаходить проєктор поруч і керує ним через Bluetooth.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "BeamDeck керує проєктором і передає зображення через вашу локальну мережу.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
@@ -235,14 +217,12 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				ENABLE_APP_SANDBOX = YES;
-				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_RESOURCE_ACCESS_BLUETOOTH = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BeamDeck/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BeamDeck;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "BeamDeck знаходить проєктор поруч і керує ним через Bluetooth.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "BeamDeck керує проєктором і передає зображення через вашу локальну мережу.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
@@ -294,7 +274,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -315,7 +295,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.5.0;
+				MARKETING_VERSION = 1.0.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -361,7 +341,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -376,7 +356,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.5.0;
+				MARKETING_VERSION = 1.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

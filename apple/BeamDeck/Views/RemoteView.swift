@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RemoteView: View {
     @EnvironmentObject private var remote: Remote
+    @EnvironmentObject private var lumina: LuminaLink
     @State private var keyboard = false
     @State private var voice = false
 
@@ -16,6 +17,7 @@ struct RemoteView: View {
                         RoundKey(symbol: "house", label: "Додому", key: "home")
                         RoundKey(symbol: "line.3.horizontal", label: "Меню", key: "menu")
                     }
+                    shortcuts
                     media
                     volume
                     FocusStrip()
@@ -23,7 +25,7 @@ struct RemoteView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 28)
             }
-            .navigationTitle(remote.status.model)
+            .navigationTitle(remote.projectorName)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -54,62 +56,71 @@ struct RemoteView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Circle().fill(remote.receiverReady || remote.firmware || remote.demo ? Color.green : .orange)
+            Circle().fill(remote.connected || remote.demo ? Color.green : .orange)
                 .frame(width: 8, height: 8)
-            Text(remote.connectionLabel)
+            Text(remote.demo ? "Демо" : remote.connected ? "Bluetooth" : "Повторне підключення…")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Spacer()
-            if let app = remote.status.nowPlayingApp {
-                Label(app, systemImage: remote.status.playing ? "play.fill" : "pause.fill")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
         }
         .padding(.top, 4)
+    }
+
+    /// Projector screens Lumina Go also puts on its main remote, so every receiver handles them.
+    private var shortcuts: some View {
+        HStack(spacing: 0) {
+            ShortcutKey(symbol: "gearshape", label: "Налаштув.", packet: [1, 9])
+            ShortcutKey(symbol: "square.grid.2x2", label: "Програми", packet: [1, 10])
+            ShortcutKey(symbol: "rectangle.on.rectangle", label: "Джерело", packet: [4, 5])
+            ShortcutKey(symbol: "airplayvideo", label: "Трансляція", packet: [4, 30])
+        }
+        .padding(.vertical, 6)
+        .background(Color.surface, in: .rect(cornerRadius: 22))
     }
 
     private var media: some View {
         HStack(spacing: 0) {
             MediaKey(symbol: "backward.fill", key: "previous")
-            MediaKey(symbol: remote.status.playing ? "pause.fill" : "playpause.fill", key: "playPause", large: true)
+            MediaKey(symbol: "playpause.fill", key: "playPause", large: true)
             MediaKey(symbol: "forward.fill", key: "next")
         }
         .padding(.vertical, 6)
         .background(Color.surface, in: .rect(cornerRadius: 22))
     }
 
+    /// The receiver only takes relative volume, so there is no level to show.
     private var volume: some View {
-        let status = remote.status
-        return VStack(spacing: 8) {
-            HStack(spacing: 12) {
-                RoundKey(symbol: "speaker.minus", label: "Тихіше", key: "volumeDown")
-                VolumeSlider()
-                RoundKey(symbol: "speaker.plus", label: "Голосніше", key: "volumeUp")
-            }
-            HStack {
-                Button { remote.key("mute") } label: {
-                    Label(status.muted ? "Увімкнути звук" : "Звук",
-                          systemImage: status.muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                        .frame(minHeight: 35)
-                }
-                .disabled(!status.available("mute"))
-                .accessibilityLabel(status.muted ? "Увімкнути звук" : "Вимкнути звук")
-                Spacer()
-                if let percent = remote.volumePercent {
-                    Text(remote.volumeIsEstimated ? "≈\(percent)%" : "\(percent)%").monospacedDigit()
-                } else if remote.volumeIsEstimated {
-                    Text("Рівень не зчитується")
-                }
-            }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+        HStack(spacing: 10) {
+            HoldKey(symbol: "speaker.minus", label: "Тихіше", key: "volumeDown")
+            HoldKey(symbol: "speaker.slash", label: "Без звуку", key: "mute", repeats: false)
+            HoldKey(symbol: "speaker.plus", label: "Гучніше", key: "volumeUp")
         }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(14)
         .background(Color.surface, in: .rect(cornerRadius: 22))
+    }
+}
+
+struct ShortcutKey: View {
+    @EnvironmentObject private var remote: Remote
+    let symbol: String
+    let label: String
+    let packet: [UInt8]
+
+    var body: some View {
+        Button {
+            remote.haptic += 1
+            remote.send(packet)
+        } label: {
+            VStack(spacing: 5) {
+                Image(systemName: symbol).font(.system(size: 18, weight: .semibold))
+                Text(label).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .contentShape(.rect)
+        }
+        .buttonStyle(PressStyle())
+        .disabled(!remote.connected && !remote.demo)
+        .accessibilityLabel(label)
     }
 }
 
@@ -188,10 +199,6 @@ struct DPad: View {
     }
 
     private func send(_ key: String) {
-        guard remote.status.available(key) else {
-            remote.show(Reason.text(remote.status.reason(key) ?? ""))
-            return
-        }
         remote.key(key)
     }
 
@@ -220,9 +227,9 @@ struct RoundKey: View {
     let key: String
 
     var body: some View {
-        let available = remote.status.available(key)
+        let available = remote.available(key)
         Button {
-            if available { remote.key(key) } else { remote.show(Reason.text(remote.status.reason(key) ?? "")) }
+            remote.key(key)
         } label: {
             VStack(spacing: 6) {
                 Image(systemName: symbol)
@@ -245,9 +252,9 @@ struct MediaKey: View {
     var large = false
 
     var body: some View {
-        let available = remote.status.available(key)
+        let available = remote.available(key)
         Button {
-            if available { remote.key(key) } else { remote.show(Reason.text(remote.status.reason(key) ?? "")) }
+            remote.key(key)
         } label: {
             Image(systemName: symbol)
                 .font(.system(size: large ? 26 : 20, weight: .semibold))
@@ -269,62 +276,14 @@ struct PressStyle: ButtonStyle {
     }
 }
 
-struct VolumeSlider: View {
-    @EnvironmentObject private var remote: Remote
-    @State private var draft: Int?
-    @State private var editing = false
-    @State private var lastPreview: Int?
-    @State private var nextPreview = ContinuousClock.now
-
-    var body: some View {
-        Slider(value: Binding(
-            get: { Double(draft ?? remote.volumePercent ?? 0) },
-            set: { value in update(Int(value.rounded())) }
-        ), in: 0...100, step: 1) { editing in
-            self.editing = editing
-            if editing {
-                lastPreview = nil
-                nextPreview = .now
-            } else {
-                if let draft, draft != lastPreview { remote.setVolume(percent: draft) }
-                draft = nil
-            }
-        }
-        .disabled(!remote.canSetVolume)
-        .accessibilityLabel("Гучність")
-    }
-
-    private func update(_ percent: Int) {
-        if !editing { remote.setVolume(percent: percent); return }
-        draft = percent
-        guard .now >= nextPreview, percent != lastPreview else { return }
-        remote.setVolume(percent: percent)
-        lastPreview = percent
-        nextPreview = .now.advanced(by: .milliseconds(250))
-    }
-}
-
-/// Lens focus via learned vendor keys; hold to keep the motor running.
+/// Lens focus; hold to keep the motor running.
 struct FocusStrip: View {
-    @EnvironmentObject private var remote: Remote
-
     var body: some View {
-        let status = remote.status
-        let ready = status.available("focusUp") || status.available("focusDown")
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Фокус").font(.headline)
-                Spacer()
-                if !ready {
-                    Text(status.reason("focusUp") == "learn_required" ? "Навчіть кнопки в розділі «Проєктор»" : Reason.text(status.reason("focusUp") ?? ""))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.trailing)
-                }
-            }
+            Text("Фокус").font(.headline)
             HStack(spacing: 10) {
                 HoldKey(symbol: "minus.magnifyingglass", label: "Ближче", key: "focusDown")
-                HoldKey(symbol: "scope", label: "Авто", key: "autoFocus")
+                HoldKey(symbol: "scope", label: "Авто", key: "autoFocus", repeats: false)
                 HoldKey(symbol: "plus.magnifyingglass", label: "Далі", key: "focusUp")
             }
         }
@@ -338,22 +297,25 @@ struct HoldKey: View {
     let symbol: String
     let label: String
     let key: String
+    var repeats = true
     @State private var task: Task<Void, Never>?
 
     var body: some View {
-        let available = remote.status.available(key)
         Label(label, systemImage: symbol)
             .font(.subheadline.weight(.medium))
+            .labelStyle(.titleAndIcon)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(task == nil ? Color.surfaceRaised : Color.accentColor.opacity(0.25), in: .rect(cornerRadius: 12))
-            .opacity(available ? 1 : 0.45)
+            .opacity(remote.available(key) ? 1 : 0.45)
             .contentShape(.rect)
             .gesture(DragGesture(minimumDistance: 0)
                 .onChanged { _ in
                     guard task == nil else { return }
-                    guard available else { remote.show(Reason.text(remote.status.reason(key) ?? "")); task = Task {}; return }
                     task = Task {
                         remote.key(key)
+                        guard repeats else { return }
                         try? await Task.sleep(for: .milliseconds(400))
                         while !Task.isCancelled {
                             remote.key(key)
@@ -363,7 +325,7 @@ struct HoldKey: View {
                 }
                 .onEnded { _ in task?.cancel(); task = nil })
             .accessibilityAddTraits(.isButton)
-            .accessibilityLabel("Фокус: \(label)")
+            .accessibilityLabel(label)
             .accessibilityAction { remote.key(key) }
     }
 }
@@ -374,7 +336,6 @@ struct PowerMenu: View {
     var body: some View {
         Menu {
             Button { remote.key("standby") } label: { Label("Режим сну", systemImage: "moon") }
-            Button { remote.key("wakeup") } label: { Label("Розбудити", systemImage: "sun.max") }
             Divider()
             Button(role: .destructive) { remote.key("power") } label: { Label("Вимкнути проєктор", systemImage: "power") }
         } label: {
@@ -402,21 +363,18 @@ struct KeyboardSheet: View {
                         .autocorrectionDisabled()
                         .onSubmit(sendText)
                 } footer: {
-                    Text(remote.status.keyboard == "ready" ? "Текст з’явиться в полі на проєкторі."
-                         : Reason.text(remote.status.keyboard))
+                    Text("Спершу виберіть текстове поле на проєкторі, наприклад пошук. Текст з’явиться в ньому.")
                 }
                 Section {
                     Button("Надіслати в поле", action: sendText).disabled(text.isEmpty)
-                    Button("Відкрити як посилання") { remote.send("open", ["destination": "url", "value": text]); dismiss() }
+                    Button("Відкрити як посилання") { remote.openLink(text); dismiss() }
                         .disabled(!(text.hasPrefix("http://") || text.hasPrefix("https://")))
                 }
                 Section {
-                    Button { remote.send("text", ["action": "delete", "text": ""]) } label: { Label("Стерти символ", systemImage: "delete.left") }
-                    Button { remote.send("text", ["action": "enter", "text": ""]) } label: { Label("Enter", systemImage: "return") }
-                    if remote.firmware {
-                        ForEach(Lumina.keyboardCommands) { command in
-                            Button(command.title) { remote.firmwareCommand(command) }
-                        }
+                    Button { remote.deleteCharacter() } label: { Label("Стерти символ", systemImage: "delete.left") }
+                    Button { remote.enter() } label: { Label("Enter", systemImage: "return") }
+                    ForEach(Lumina.keyboardCommands) { command in
+                        Button(command.title) { remote.command(command) }
                     }
                 }
             }
@@ -432,7 +390,7 @@ struct KeyboardSheet: View {
 
     private func sendText() {
         guard !text.isEmpty else { return }
-        remote.send("text", ["action": "text", "text": text])
+        remote.typeText(text)
         text = ""
     }
 }

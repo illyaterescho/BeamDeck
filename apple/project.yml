@@ -7,8 +7,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.5.0"
-    CURRENT_PROJECT_VERSION: "8"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "9"
     DEVELOPMENT_TEAM: ""
 targets:
   BeamDeck:
@@ -21,24 +21,18 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: BeamDeck
         INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: "BeamDeck знаходить проєктор поруч і керує ним через Bluetooth."
-        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "BeamDeck керує проєктором і передає зображення через вашу локальну мережу."
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown"
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
         ENABLE_APP_SANDBOX: YES
-        ENABLE_OUTGOING_NETWORK_CONNECTIONS: YES
         ENABLE_RESOURCE_ACCESS_BLUETOOTH: YES
         CODE_SIGN_STYLE: Automatic
     info:
       path: BeamDeck/Info.plist
       properties:
-        NSScreenCaptureUsageDescription: "BeamDeck показує вибраний екран iPhone на підключеному проєкторі."
         NSMicrophoneUsageDescription: "BeamDeck слухає голосові команди, лише поки ви утримуєте кнопку мікрофона."
         NSSpeechRecognitionUsageDescription: "BeamDeck розпізнає українські голосові команди для керування проєктором."
         CFBundleURLTypes:
           - CFBundleURLName: ua.beamdeck.remote
             CFBundleURLSchemes: [beamdeck]
-        UIBackgroundModes: [screen-capture]
-        NSAppTransportSecurity:
-          NSAllowsLocalNetworking: true
