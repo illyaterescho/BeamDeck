@@ -338,11 +338,8 @@ enum Lumina {
         case "standby": return [3, 2]
         case "focusUp": return [4, 1]
         case "focusDown": return [4, 2]
-        case "autoFocus": return [4, 3]
         case "input": return [4, 5]
-        case "keystone": return [4, 16]
-        case "custom1": return [5, 1]
-        case "custom2": return [5, 2]
+        case "cast": return [4, 30]
         case "next": return [7, 4]
         case "previous": return [7, 5]
         case "playPause": return [7, 6]
@@ -350,12 +347,12 @@ enum Lumina {
         }
     }
 
-    /// Keys the firmware receiver handles, for lighting up the remote UI.
+    /// Keys this receiver handles. Autofocus (319), keystone (332) and the custom keys are vendor key codes
+    /// that the HY350 MAX firmware ignores, so they are not offered.
     static let supported: Set<String> = [
         "up", "down", "left", "right", "ok", "back", "home", "menu", "settings", "recents", "apps",
         "volumeUp", "volumeDown", "mute", "power", "wakeup", "standby",
-        "focusUp", "focusDown", "autoFocus", "input", "keystone", "custom1", "custom2",
-        "next", "previous", "playPause", "pointer",
+        "focusUp", "focusDown", "input", "cast", "next", "previous", "playPause", "pointer",
     ]
 
     static let shortcuts: [(id: String, label: String, packet: [UInt8])] = [

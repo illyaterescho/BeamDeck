@@ -5,14 +5,16 @@ import SwiftUI
 /// nothing is installed on the projector.
 @MainActor
 final class Remote: ObservableObject {
+    /// One instance for the whole process, so lock-screen buttons reach the same Bluetooth link.
+    static let shared = Remote()
+
     let lumina = LuminaLink()
+    let macros = MacroStore()
     @Published var notice: String?
     @Published var haptic = 0
     @Published private(set) var connected = false
     /// Last volume the user set; the receiver never reports the real level.
     @Published private(set) var volume: Int?
-    /// Commands the user marked as working (true) or ignored (false) on this projector.
-    @Published private(set) var compatibility: [String: Bool] = [:]
 
     /// `-demo` launch argument: try the interface without a projector.
     let demo = ProcessInfo.processInfo.arguments.contains("-demo")
@@ -28,7 +30,6 @@ final class Remote: ObservableObject {
         // Reconnect to the last projector on launch, the way a hardware remote just works.
         if let saved = UserDefaults.standard.string(forKey: savedKey).flatMap(UUID.init(uuidString:)) {
             lumina.connect(saved)
-            loadCompatibility(for: saved.uuidString)
         }
     }
 
@@ -41,7 +42,6 @@ final class Remote: ObservableObject {
 
     func connect(_ id: UUID) {
         UserDefaults.standard.set(id.uuidString, forKey: savedKey)
-        loadCompatibility(for: id.uuidString)
         lumina.connect(id)
     }
 
@@ -49,10 +49,16 @@ final class Remote: ObservableObject {
         UserDefaults.standard.removeObject(forKey: savedKey)
         lumina.disconnect()
         lumina.scan()
+        #if os(iOS)
+        refreshLiveRemote()
+        #endif
     }
 
     private func phaseChanged() {
         connected = lumina.connected
+        #if os(iOS)
+        refreshLiveRemote()
+        #endif
         if connected, volume == nil, let id = lumina.peripheralId,
            UserDefaults.standard.object(forKey: "volume:\(id)") != nil {
             volume = UserDefaults.standard.integer(forKey: "volume:\(id)")
@@ -191,18 +197,6 @@ final class Remote: ObservableObject {
         }
         haptic += 1
         send(shortcut.packet)
-    }
-
-    // MARK: compatibility marks for extended commands
-
-    func mark(_ commandId: String, works: Bool?) {
-        compatibility[commandId] = works
-        guard let id = lumina.peripheralId ?? UserDefaults.standard.string(forKey: savedKey) else { return }
-        UserDefaults.standard.set(compatibility, forKey: "compat:\(id)")
-    }
-
-    private func loadCompatibility(for id: String) {
-        compatibility = UserDefaults.standard.dictionary(forKey: "compat:\(id)") as? [String: Bool] ?? [:]
     }
 
     // MARK: notices

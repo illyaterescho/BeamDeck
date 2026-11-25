@@ -7,17 +7,23 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.0.2"
-    CURRENT_PROJECT_VERSION: "11"
+    MARKETING_VERSION: "1.1.0"
+    CURRENT_PROJECT_VERSION: "12"
     DEVELOPMENT_TEAM: ""
+    # One place for the app id; the widget extension derives its own from it.
+    BEAMDECK_BUNDLE_ID: ua.beamdeck.remote
 targets:
   BeamDeck:
     type: application
     supportedDestinations: [iOS, macOS]
     sources: [BeamDeck]
+    dependencies:
+      - target: BeamDeckWidgets
+        embed: true
+        destinationFilters: [iOS]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: ua.beamdeck.remote
+        PRODUCT_BUNDLE_IDENTIFIER: $(BEAMDECK_BUNDLE_ID)
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: BeamDeck
         INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: "BeamDeck знаходить проєктор поруч і керує ним через Bluetooth."
@@ -33,6 +39,29 @@ targets:
       properties:
         NSMicrophoneUsageDescription: "BeamDeck слухає голосові команди, лише поки ви утримуєте кнопку мікрофона."
         NSSpeechRecognitionUsageDescription: "BeamDeck розпізнає українські голосові команди для керування проєктором."
+        NSSupportsLiveActivities: true
+        # Keeps the projector link while the app is in the background, so Lock Screen buttons answer at once.
+        UIBackgroundModes: [bluetooth-central]
         CFBundleURLTypes:
           - CFBundleURLName: ua.beamdeck.remote
             CFBundleURLSchemes: [beamdeck]
+
+  BeamDeckWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - BeamDeckWidgets
+      - BeamDeck/Shared/LiveRemote.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(BEAMDECK_BUNDLE_ID).widgets
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: BeamDeck
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+    info:
+      path: BeamDeckWidgets/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension

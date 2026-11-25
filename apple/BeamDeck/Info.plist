@@ -33,5 +33,11 @@
 	<string>BeamDeck слухає голосові команди, лише поки ви утримуєте кнопку мікрофона.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>BeamDeck розпізнає українські голосові команди для керування проєктором.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+	</array>
 </dict>
 </plist>

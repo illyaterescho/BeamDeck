@@ -4,6 +4,7 @@ import SwiftUI
 /// Hold the microphone, speak Ukrainian, release: the phrase is parsed on the phone and sent to the projector.
 struct VoiceView: View {
     @EnvironmentObject private var remote: Remote
+    @EnvironmentObject private var macros: MacroStore
     @Environment(\.dismiss) private var dismiss
     @StateObject private var voice = VoiceControl()
     @State private var actions: [VoiceAction] = []
@@ -12,7 +13,7 @@ struct VoiceView: View {
 
     private let examples = [
         "вниз три рази і ок", "на головну", "гучність 30", "тихіше двічі", "пауза",
-        "відкрий ютуб", "знайди мультики", "напиши Дюна", "фокус ближче", "автофокус",
+        "відкрий ютуб", "знайди мультики", "напиши Дюна", "фокус ближче", "макрос трапеція",
     ]
 
     var body: some View {
@@ -86,6 +87,12 @@ struct VoiceView: View {
                     Task {
                         let phrase = await voice.finish()
                         heard = phrase
+                        // A saved macro wins: "макрос трапеція" or just its name.
+                        if let macro = macros.match(phrase) {
+                            actions = [.firmware(category: 0, action: 0, label: "Макрос «\(macro.name)»")]
+                            macros.play(macro, on: remote)
+                            return
+                        }
                         actions = VoiceCommands.parse(phrase)
                         if !actions.isEmpty { await remote.perform(actions) }
                     }

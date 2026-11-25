@@ -18,6 +18,7 @@ struct RemoteView: View {
                         RoundKey(symbol: "line.3.horizontal", label: "Меню", key: "menu")
                     }
                     shortcuts
+                    MacroBar()
                     media
                     volume
                     FocusStrip()
@@ -315,7 +316,6 @@ struct FocusStrip: View {
             Text("Фокус").font(.headline)
             HStack(spacing: 10) {
                 HoldKey(symbol: "minus.magnifyingglass", label: "Ближче", key: "focusDown")
-                HoldKey(symbol: "scope", label: "Авто", key: "autoFocus", repeats: false)
                 HoldKey(symbol: "plus.magnifyingglass", label: "Далі", key: "focusUp")
             }
         }

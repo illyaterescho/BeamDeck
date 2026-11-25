@@ -2,13 +2,21 @@ import SwiftUI
 
 @main
 struct BeamDeckApp: App {
-    @StateObject private var remote = Remote()
+    @StateObject private var remote = Remote.shared
+
+    init() {
+        #if os(iOS)
+        // Lock-screen and Dynamic Island buttons run their intent in this process.
+        LiveRemoteBridge.press = { key in await Remote.shared.pressFromBackground(key) }
+        #endif
+    }
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(remote)
                 .environmentObject(remote.lumina)
+                .environmentObject(remote.macros)
                 #if os(macOS)
                 .frame(minWidth: 380, idealWidth: 420, minHeight: 720, idealHeight: 820)
                 #endif
