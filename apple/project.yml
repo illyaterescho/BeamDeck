@@ -7,8 +7,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.4.0"
-    CURRENT_PROJECT_VERSION: "7"
+    MARKETING_VERSION: "0.5.0"
+    CURRENT_PROJECT_VERSION: "8"
     DEVELOPMENT_TEAM: ""
 targets:
   BeamDeck:
@@ -34,6 +34,11 @@ targets:
       path: BeamDeck/Info.plist
       properties:
         NSScreenCaptureUsageDescription: "BeamDeck показує вибраний екран iPhone на підключеному проєкторі."
+        NSMicrophoneUsageDescription: "BeamDeck слухає голосові команди, лише поки ви утримуєте кнопку мікрофона."
+        NSSpeechRecognitionUsageDescription: "BeamDeck розпізнає українські голосові команди для керування проєктором."
+        CFBundleURLTypes:
+          - CFBundleURLName: ua.beamdeck.remote
+            CFBundleURLSchemes: [beamdeck]
         UIBackgroundModes: [screen-capture]
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

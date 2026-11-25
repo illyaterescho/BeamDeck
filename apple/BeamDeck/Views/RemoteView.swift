@@ -3,6 +3,7 @@ import SwiftUI
 struct RemoteView: View {
     @EnvironmentObject private var remote: Remote
     @State private var keyboard = false
+    @State private var voice = false
 
     var body: some View {
         NavigationStack {
@@ -27,12 +28,27 @@ struct RemoteView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
+                #if os(iOS)
+                ToolbarItem(placement: .primaryAction) {
+                    Button { voice = true } label: { Label("Голос", systemImage: "mic") }
+                }
+                #endif
+                ToolbarItem(placement: .primaryAction) {
+                    // Links open on the projector, any other text is typed into the focused field.
+                    PasteButton(payloadType: String.self) { values in
+                        Task { @MainActor in remote.deliver(values.first ?? "") }
+                    }
+                    .labelStyle(.iconOnly)
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button { keyboard = true } label: { Label("Клавіатура", systemImage: "keyboard") }
                 }
                 ToolbarItem(placement: .primaryAction) { PowerMenu() }
             }
             .sheet(isPresented: $keyboard) { KeyboardSheet() }
+            #if os(iOS)
+            .sheet(isPresented: $voice) { VoiceView() }
+            #endif
         }
     }
 

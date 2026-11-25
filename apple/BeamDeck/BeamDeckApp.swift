@@ -48,6 +48,13 @@ struct RootView: View {
             }
         }
         .sensoryFeedback(.impact(weight: .light, intensity: 0.8), trigger: remote.haptic)
+        // beamdeck://open?url=… and beamdeck://type?text=… — lets the Shortcuts share sheet hand content to the projector.
+        .onOpenURL { url in
+            guard url.scheme == "beamdeck",
+                  let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems else { return }
+            let value = items.first { $0.name == "url" || $0.name == "text" }?.value ?? ""
+            remote.deliver(value)
+        }
     }
 }
 
