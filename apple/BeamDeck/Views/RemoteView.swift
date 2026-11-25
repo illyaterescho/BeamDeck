@@ -88,15 +88,47 @@ struct RemoteView: View {
         .background(Color.surface, in: .rect(cornerRadius: 22))
     }
 
-    /// The receiver only takes relative volume, so there is no level to show.
+    /// Slider sets a percentage; the receiver never reports the real level, so the value is the last one set here.
     private var volume: some View {
-        HStack(spacing: 10) {
-            HoldKey(symbol: "speaker.minus", label: "Тихіше", key: "volumeDown")
-            HoldKey(symbol: "speaker.slash", label: "Без звуку", key: "mute", repeats: false)
-            HoldKey(symbol: "speaker.plus", label: "Гучніше", key: "volumeUp")
+        VStack(spacing: 12) {
+            VolumeSlider()
+            HStack(spacing: 10) {
+                HoldKey(symbol: "speaker.minus", label: "Тихіше", key: "volumeDown")
+                HoldKey(symbol: "speaker.slash", label: "Без звуку", key: "mute", repeats: false)
+                HoldKey(symbol: "speaker.plus", label: "Гучніше", key: "volumeUp")
+            }
         }
         .padding(14)
         .background(Color.surface, in: .rect(cornerRadius: 22))
+    }
+}
+
+struct VolumeSlider: View {
+    @EnvironmentObject private var remote: Remote
+    @State private var draft: Double?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "speaker.fill").foregroundStyle(.secondary)
+            Slider(value: Binding(
+                get: { draft ?? Double(remote.volume ?? 50) },
+                set: { value in
+                    draft = value
+                    remote.setVolume(Int(value.rounded()), final: false)
+                }
+            ), in: 0...100) { editing in
+                if !editing, let draft {
+                    remote.setVolume(Int(draft.rounded()), final: true)
+                    self.draft = nil
+                }
+            }
+            .accessibilityLabel("Гучність")
+            Text(remote.volume.map { "\($0)%" } ?? "—")
+                .font(.footnote.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(width: 40, alignment: .trailing)
+        }
+        .disabled(!remote.connected && !remote.demo)
     }
 }
 

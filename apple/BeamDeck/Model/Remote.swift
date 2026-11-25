@@ -9,6 +9,8 @@ final class Remote: ObservableObject {
     @Published var notice: String?
     @Published var haptic = 0
     @Published private(set) var connected = false
+    /// Last volume the user set; the receiver never reports the real level.
+    @Published private(set) var volume: Int?
     /// Commands the user marked as working (true) or ignored (false) on this projector.
     @Published private(set) var compatibility: [String: Bool] = [:]
 
@@ -17,6 +19,7 @@ final class Remote: ObservableObject {
 
     private var noticeTask: Task<Void, Never>?
     private var selfTestRan = false
+    private var lastVolumeSend = ContinuousClock.now
     private let savedKey = "lastLumina"
 
     init() {
@@ -50,6 +53,10 @@ final class Remote: ObservableObject {
 
     private func phaseChanged() {
         connected = lumina.connected
+        if connected, volume == nil, let id = lumina.peripheralId,
+           UserDefaults.standard.object(forKey: "volume:\(id)") != nil {
+            volume = UserDefaults.standard.integer(forKey: "volume:\(id)")
+        }
         if case .failed(let message) = lumina.phase { show(message) }
         if connected, ProcessInfo.processInfo.arguments.contains("-selftest"), !selfTestRan {
             selfTestRan = true
@@ -94,6 +101,23 @@ final class Remote: ObservableObject {
     func send(_ packet: [UInt8], afterMotion: Bool = false) {
         guard !demo else { return }
         do { try lumina.send(packet, afterMotion: afterMotion) } catch { show(error.localizedDescription) }
+    }
+
+    // MARK: volume level
+
+    /// Sets the volume in percent with the receiver's value command (meta "value:N", then [13, 2]).
+    /// While dragging, sends at most every 200 ms; `final` always sends.
+    func setVolume(_ percent: Int, final: Bool) {
+        let percent = max(0, min(100, percent))
+        volume = percent
+        guard final || .now >= lastVolumeSend.advanced(by: .milliseconds(200)) else { return }
+        lastVolumeSend = .now
+        if final {
+            UserDefaults.standard.set(percent, forKey: "volume:\(lumina.peripheralId ?? "")")
+            haptic += 1
+        }
+        guard !demo else { return }
+        do { try lumina.send(.value("Гучність", 2, percent)) } catch { show(error.localizedDescription) }
     }
 
     // MARK: mouse (category 7, told apart from media keys by packet length)

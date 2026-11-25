@@ -11,8 +11,7 @@ extension Remote {
                     self.key(key)
                 }
             case .volume(let percent):
-                // The built-in receiver's percentage command is voice-only in Lumina Go; send it like Lumina does.
-                command(.value("Гучність \(percent)%", 2, max(0, min(100, percent))))
+                setVolume(percent, final: true)
             case .launch(let id, _):
                 launch(id)
             case .type(let text):
